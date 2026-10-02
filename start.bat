@@ -1,3 +1,9 @@
-python F:\simplechess\simple_chess.py
-Write-Host -NoNewLine 'Press any key to continue...';
-$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown');
+@echo off
+cd /d "%~dp0"
+where py >nul 2>nul
+if %errorlevel% equ 0 (
+    py -3 simple_chess.py --config ai_config.json
+) else (
+    python simple_chess.py --config ai_config.json
+)
+pause

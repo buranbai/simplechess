@@ -1,5 +1,10 @@
 import tkinter as tk
 from tkinter import messagebox, simpledialog
+import argparse
+import queue
+import threading
+from pathlib import Path
+from ai_players import choose_move, load_config
 
 # ---------------------------------------------------------------------------
 # Compact game-state format
@@ -32,27 +37,32 @@ UNICODE_PIECES = {
 
 
 def square_name(row, col):
+    """Convert zero-based board coordinates to a square name such as e4."""
     return FILES[col] + str(8 - row)
 
 
 def parse_square(name):
+    """Validate a square name and convert it to zero-based row and column."""
     if len(name) != 2 or name[0] not in FILES or name[1] not in RANKS:
         raise ValueError(f"Invalid square: {name}")
     return 8 - int(name[1]), FILES.index(name[0])
 
 
 def piece_color(piece):
+    """Return w or b from a piece's letter case, or None for an empty square."""
     if piece is None:
         return None
     return "w" if piece.isupper() else "b"
 
 
 def other(color):
+    """Return the opposing player's colour."""
     return "b" if color == "w" else "w"
 
 
 class ChessGame:
     def __init__(self, state=START_STATE):
+        """Create a game from the starting position or a supplied state string."""
         self.load(state)
 
     # ------------------------------------------------------------------
@@ -60,6 +70,7 @@ class ChessGame:
     # ------------------------------------------------------------------
 
     def load(self, state):
+        """Parse and validate the serialized board, turn, rights, and last move."""
         try:
             position, self.last_move = state.strip().split(";", 1)
             board_text, self.turn, castling, ep = position.split()
@@ -103,6 +114,7 @@ class ChessGame:
             raise ValueError(f"Invalid state string: {exc}") from exc
 
     def save(self):
+        """Serialize the current position and last move into the compact state format."""
         ranks = []
         for row in self.board:
             encoded = ""
@@ -129,6 +141,7 @@ class ChessGame:
     # ------------------------------------------------------------------
 
     def find_king(self, color):
+        """Find the given colour's king, raising an error if it is missing."""
         wanted = "K" if color == "w" else "k"
         for r in range(8):
             for c in range(8):
@@ -137,6 +150,7 @@ class ChessGame:
         raise ValueError("King missing")
 
     def is_square_attacked(self, row, col, by_color):
+        """Check whether any piece of the given colour attacks this square."""
         # Pawns
         pawn = "P" if by_color == "w" else "p"
         pawn_source_row = row + 1 if by_color == "w" else row - 1
@@ -194,6 +208,7 @@ class ChessGame:
         return False
 
     def in_check(self, color):
+        """Check whether the given colour's king is under attack."""
         kr, kc = self.find_king(color)
         return self.is_square_attacked(kr, kc, other(color))
 
@@ -257,6 +272,7 @@ class ChessGame:
     def _validate_piece_move(
         self, sr, sc, dr, dc, promotion=None, check_castling_attacks=True
     ):
+        """Check piece movement rules, promotion, en passant, and castling conditions."""
         piece = self.board[sr][sc]
         color = piece_color(piece)
         target = self.board[dr][dc]
@@ -392,6 +408,7 @@ class ChessGame:
         return False, "Unknown piece"
 
     def _path_clear(self, sr, sc, dr, dc):
+        """Check that all squares between a sliding piece's source and destination are empty."""
         step_r = 0 if dr == sr else (1 if dr > sr else -1)
         step_c = 0 if dc == sc else (1 if dc > sc else -1)
 
@@ -408,6 +425,7 @@ class ChessGame:
     # ------------------------------------------------------------------
 
     def move(self, src, dst, promotion=None):
+        """Apply a legal move, record it, and switch turns; otherwise return the reason."""
         ok, reason = self.validate_move(src, dst, promotion)
         if not ok:
             return False, reason
@@ -423,6 +441,7 @@ class ChessGame:
         return True, ""
 
     def _apply_unchecked(self, sr, sc, dr, dc, promotion):
+        """Update pieces and special-move state without validation or switching turns."""
         piece = self.board[sr][sc]
         color = piece_color(piece)
         target = self.board[dr][dc]
@@ -463,6 +482,7 @@ class ChessGame:
             self.en_passant = ((sr + dr) // 2, sc)
 
     def _update_castling_rights(self, piece, sr, sc, captured, dr, dc):
+        """Remove castling rights when a king or home rook moves, or a home rook is captured."""
         rights = set(self.castling)
 
         if piece == "K":
@@ -501,6 +521,7 @@ class ChessGame:
     # ------------------------------------------------------------------
 
     def legal_moves(self, color=None):
+        """List legal UCI moves for the chosen colour while preserving the game state."""
         color = color or self.turn
         if color != self.turn:
             snapshot = self._snapshot()
@@ -537,6 +558,7 @@ class ChessGame:
         return moves
 
     def status(self):
+        """Return playing, check, checkmate, or stalemate for the side to move."""
         moves = self.legal_moves()
         if moves:
             return "check" if self.in_check(self.turn) else "playing"
@@ -547,6 +569,7 @@ class ChessGame:
     # ------------------------------------------------------------------
 
     def _snapshot(self):
+        """Copy the current game state so temporary move simulations can be undone."""
         return (
             [row[:] for row in self.board],
             self.turn,
@@ -556,6 +579,7 @@ class ChessGame:
         )
 
     def _restore(self, snapshot):
+        """Restore the board and move metadata from a saved snapshot."""
         (
             self.board,
             self.turn,
@@ -571,7 +595,8 @@ class ChessUI:
     SELECTED = "#f6f669"
     LEGAL = "#a9cf54"
 
-    def __init__(self, root):
+    def __init__(self, root, config=None):
+        """Build the chess window and optionally enable configured AI players."""
         self.root = root
         self.root.title("Simple Chess")
 
@@ -579,6 +604,12 @@ class ChessUI:
         self.state_string = self.game.save()
         self.selected = None
         self.legal_targets = set()
+        self.ai_config = config
+        self.ai_running = False
+        self.ai_busy = False
+        self.ai_generation = 0
+        self.ai_plies = 0
+        self.ai_results = queue.Queue()
 
         self.board_frame = tk.Frame(root)
         self.board_frame.pack(padx=10, pady=10)
@@ -620,9 +651,18 @@ class ChessUI:
             side=tk.LEFT, padx=4
         )
 
+        if config:
+            self.ai_button = tk.Button(controls, text='Request AI Move', command=self.request_ai_move)
+            self.ai_button.pack(side=tk.LEFT, padx=4)
+            players = ' | '.join(f'{side.title()}: {config[side]["provider"]}' for side in ('white', 'black'))
+            tk.Label(root, text=players).pack(pady=(0, 5))
+            self.root.after(100, self.poll_ai)
         self.refresh()
 
     def on_square(self, row, col):
+        """Handle human piece selection, destination clicks, promotion, and move results."""
+        if self.ai_config and self.current_player().get('provider', 'human') != 'human':
+            return
         piece = self.game.board[row][col]
 
         if self.selected is None:
@@ -673,6 +713,7 @@ class ChessUI:
             messagebox.showinfo("Stalemate", "The game is a draw.")
 
     def _legal_targets_for(self, row, col):
+        """Find legal destination squares for the selected piece to highlight on the board."""
         src = square_name(row, col)
         piece = self.game.board[row][col]
         targets = set()
@@ -695,6 +736,7 @@ class ChessUI:
         return targets
 
     def ask_promotion(self):
+        """Ask the human player for a promotion piece, or return None if cancelled."""
         while True:
             value = simpledialog.askstring(
                 "Promotion",
@@ -709,9 +751,13 @@ class ChessUI:
             messagebox.showerror("Invalid promotion", "Choose Q, R, B, or N.")
 
     def load_state(self):
+        """Load the entered position and pause AI play, reporting invalid states."""
         text = self.state_var.get().strip()
         try:
-            self.game = ChessGame(text)
+            game = ChessGame(text)
+            self.stop_ai()
+            self.game = game
+            self.ai_plies = 0
             self.state_string = self.game.save()
             self.state_var.set(self.state_string)
             self.selected = None
@@ -721,6 +767,9 @@ class ChessUI:
             messagebox.showerror("Invalid state", str(exc))
 
     def reset(self):
+        """Pause AI play and restore the starting board and AI move counter."""
+        self.stop_ai()
+        self.ai_plies = 0
         self.game = ChessGame(START_STATE)
         self.state_string = self.game.save()
         self.state_var.set(self.state_string)
@@ -729,10 +778,82 @@ class ChessUI:
         self.refresh()
 
     def copy_state(self):
+        """Copy the state entry's text to the system clipboard."""
         self.root.clipboard_clear()
         self.root.clipboard_append(self.state_var.get())
 
+    def current_player(self):
+        """Return the configured player for the side whose turn it is."""
+        return self.ai_config['white' if self.game.turn == 'w' else 'black']
+
+    def stop_ai(self):
+        """Clear the requested AI turn and invalidate pending results without cancelling sent requests."""
+        self.ai_running = False
+        self.ai_generation += 1
+        if self.ai_config:
+            self.ai_button.configure(text='Request AI Move')
+
+    def request_ai_move(self):
+        """Request exactly one AI turn when the current side is AI and no request is pending."""
+        if self.ai_busy or self.ai_running or self.current_player()['provider'] == 'human':
+            return
+        if self.game.status() in ('checkmate', 'stalemate'):
+            return
+        self.ai_running = True
+        self.selected = None
+        self.legal_targets.clear()
+        self.refresh()
+
+    def poll_ai(self):
+        """Process a requested AI turn in the background, then wait for another manual request."""
+        try:
+            generation, state, move, error = self.ai_results.get_nowait()
+        except queue.Empty:
+            pass
+        else:
+            self.ai_busy = False
+            if self.ai_running and generation == self.ai_generation and self.game.save() == state:
+                if error:
+                    self.stop_ai()
+                    messagebox.showerror('AI paused', error)
+                else:
+                    ok, reason = self.game.move(move[:2], move[2:4], move[4:] or None)
+                    if not ok:
+                        self.stop_ai()
+                        messagebox.showerror('AI paused', reason)
+                    else:
+                        self.ai_plies += 1
+                        self.state_string = self.game.save()
+                        self.state_var.set(self.state_string)
+                self.stop_ai()
+            self.refresh()
+        if self.ai_running and not self.ai_busy:
+            if self.game.status() in ('checkmate', 'stalemate'):
+                self.stop_ai()
+                self.refresh()
+            elif self.ai_plies >= self.ai_config['max_plies']:
+                self.stop_ai()
+                messagebox.showinfo('AI paused', 'AI move limit reached. Reset or load a state to start a new run.')
+            elif self.current_player().get('provider', 'human') != 'human':
+                state = self.game.save()
+                generation = self.ai_generation
+                player = self.current_player().copy()
+                self.ai_busy = True
+                self.status_label.configure(text=f'{player["provider"]} is thinking…')
+
+                def worker():
+                    """Request a validated AI move in the background and queue its result or error."""
+                    try:
+                        move = choose_move(ChessGame(state), player, self.ai_config)
+                        self.ai_results.put((generation, state, move, None))
+                    except Exception as exc:
+                        self.ai_results.put((generation, state, None, str(exc)))
+
+                threading.Thread(target=worker, daemon=True).start()
+        self.root.after(100, self.poll_ai)
+
     def refresh(self):
+        """Redraw pieces, selection highlights, and the current game status."""
         for r in range(8):
             for c in range(8):
                 piece = self.game.board[r][c]
@@ -766,9 +887,16 @@ class ChessUI:
             text += f" | Last move: {self.game.last_move}"
 
         self.status_label.configure(text=text)
+        if self.ai_config:
+            waiting = self.ai_busy or self.ai_running
+            enabled = (not waiting and self.current_player()['provider'] != 'human'
+                       and status not in ('checkmate', 'stalemate'))
+            self.ai_button.configure(text='Thinking…' if waiting else 'Request AI Move',
+                                     state=tk.NORMAL if enabled else tk.DISABLED)
 
 
 def run_tests():
+    """Check engine serialization, basic moves, checkmate, and special chess moves."""
     # Basic movement.
     g = ChessGame()
     assert g.move("e2", "e4")[0]
@@ -824,7 +952,17 @@ def run_tests():
 
 
 if __name__ == "__main__":
-    run_tests()
-    root = tk.Tk()
-    ChessUI(root)
-    root.mainloop()
+    parser = argparse.ArgumentParser(description='Simple Chess with optional AI players')
+    parser.add_argument('--config', type=Path, help='AI player JSON configuration')
+    parser.add_argument('--test', action='store_true', help='Run engine tests without a window')
+    args = parser.parse_args()
+    if args.test:
+        run_tests()
+    else:
+        try:
+            config = load_config(args.config.resolve()) if args.config else None
+        except (ValueError, OSError) as exc:
+            parser.error(str(exc))
+        root = tk.Tk()
+        ChessUI(root, config)
+        root.mainloop()

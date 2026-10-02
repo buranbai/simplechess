@@ -1,4 +1,4 @@
-"""AI transport and strict, single-move state validation (standard library only)."""
+"""AI transport and strict UCI move validation (standard library only)."""
 import json
 import os
 import re
@@ -54,20 +54,13 @@ def load_config(path):
 
 
 def validated_move(game, response):
-    """Never trust a model-supplied board: reproduce it using the chess engine."""
-    from simple_chess import ChessGame
-    response = response.strip()
-    if '\n' in response or ';' not in response:
-        raise ValueError('Return only one serialized state line')
-    move = response.rsplit(';', 1)[1]
+    """Accept only one legal UCI move, preserving the current board during validation."""
+    move = response.strip()
     if not re.fullmatch(r'[a-h][1-8][a-h][1-8][qrbn]?', move):
-        raise ValueError('Last move must be UCI, for example e2e4 or a7a8q')
-    candidate = ChessGame(game.save())
-    ok, reason = candidate.move(move[:2], move[2:4], move[4:] or None)
+        raise ValueError('Return only one UCI move, for example e2e4 or a7a8q')
+    ok, reason = game.validate_move(move[:2], move[2:4], move[4:] or None)
     if not ok:
         raise ValueError(f'Illegal move: {reason}')
-    if candidate.save() != response:
-        raise ValueError('Returned board, turn, castling or en-passant does not match the move')
     return move
 
 
@@ -108,26 +101,32 @@ def request_text(player, prompt, config):
     return text
 
 
-def choose_move(game, player, config):
-    """Send the position and colour to an AI, retrying invalid states within the configured limit."""
+def choose_move(game, player, config, on_exchange=None):
+    """Request a legal AI move and optionally report prompts, responses, and retry errors."""
     color = 'White' if game.turn == 'w' else 'Black'
     prompt = (
         f'You are playing chess as {color}. It is your turn. Choose one strong legal move.\n'
-        'State format: <FEN piece placement> <next turn w/b> <castling KQkq or -> '
+        'Input state format: <FEN piece placement> <side to move w/b> <castling KQkq or -> '
         '<en-passant target or ->;<last move in UCI or ->.\n'
         'Uppercase pieces are White; lowercase pieces are Black. Board ranks run 8 to 1.\n'
-        'Return ONLY the resulting state AFTER your move, in exactly the same format. '
-        'Update board, switch turn, update castling rights and en-passant target, '
-        'and replace last-move with your chosen move (promotion suffix q/r/b/n). '
-        'No markdown, explanation, or extra fields.\n'
+        'Return ONLY one move from the legal moves list in UCI format, '
+        'for example e2e4 or a7a8q (promotion suffix q/r/b/n). '
+        'For castling use the king move, such as e1g1. '
+        'Do not return the board state, markdown, explanation, or extra fields.\n'
         f'Current state: {game.save()}\nLast move: {game.last_move}\n'
         f'Legal moves: {", ".join(game.legal_moves())}'
     )
     for attempt in range(config['attempts']):
+        if on_exchange:
+            on_exchange('sent', attempt + 1, prompt)
         response = request_text(player, prompt, config)
+        if on_exchange:
+            on_exchange('received', attempt + 1, response)
         try:
             return validated_move(game, response)
         except ValueError as exc:
+            if on_exchange:
+                on_exchange('validation', attempt + 1, str(exc))
             if attempt + 1 == config['attempts']:
                 raise RuntimeError(f'AI response rejected: {exc}') from None
             prompt += f'\nYour previous response was invalid: {exc}. Try again using the original current state.'

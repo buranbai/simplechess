@@ -14,18 +14,16 @@ class AIPlayersTests(unittest.TestCase):
     def setUp(self):
         """Prepare a starting game, a valid example response, and shared request settings."""
         self.game = ChessGame()
-        after = ChessGame()
-        after.move('e2', 'e4')
-        self.response = after.save()
+        self.response = 'e2e4'
         self.config = {'attempts': 2, 'timeout_seconds': 10, 'max_output_tokens': 2048}
 
-    def test_validate_and_reject_tampered_board(self):
-        """Verify valid responses are accepted and illegal or inconsistent states are rejected."""
+    def test_validate_and_reject_invalid_responses(self):
+        """Accept legal UCI moves and reject illegal moves, board states, and extra text."""
         self.assertEqual(validated_move(self.game, self.response), 'e2e4')
         self.assertEqual(self.game.save(), START_STATE)
-        for response in (START_STATE.replace(';-', ';e2e4'), self.response.replace(' b ', ' w '),
-                         self.response.replace(' e3;', ' -;'), START_STATE.replace(';-', ';e2e5'),
-                         '```\n' + self.response + '\n```'):
+        self.assertEqual(validated_move(self.game, ' e2e4\n'), 'e2e4')
+        for response in (START_STATE, 'e2e5', 'e7e5', 'e2e4 e7e5', 'e2e4\ne7e5',
+                         'My move is e2e4', 'Nf3', '```\ne2e4\n```'):
             with self.assertRaises(ValueError):
                 validated_move(self.game, response)
 
@@ -38,7 +36,16 @@ class AIPlayersTests(unittest.TestCase):
             original = ChessGame(state)
             result = ChessGame(state)
             self.assertTrue(result.move(move[:2], move[2:4], move[4:] or None)[0])
-            self.assertEqual(validated_move(original, result.save()), move)
+            self.assertEqual(validated_move(original, move), move)
+            self.assertEqual(original.save(), state)
+
+    def test_black_knight_move_updates_board_in_engine(self):
+        """Validate the reported b8c6 case and let the engine remove the knight from b8."""
+        game = ChessGame('rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq -;g1f3')
+        move = validated_move(game, 'b8c6')
+        self.assertTrue(game.move(move[:2], move[2:4])[0])
+        self.assertIsNone(game.board[0][1])
+        self.assertEqual(game.board[2][2], 'n')
 
     @patch('ai_players.request_text')
     def test_prompt_and_retry(self, request):
@@ -50,10 +57,24 @@ class AIPlayersTests(unittest.TestCase):
         self.assertIn(START_STATE, prompt)
         self.assertIn('Last move: -', prompt)
         self.assertIn('e2e4', prompt)
+        self.assertIn('Return ONLY one move', prompt)
         self.assertEqual(request.call_count, 2)
         request.side_effect = ['bad', 'bad']
         with self.assertRaises(RuntimeError):
             choose_move(self.game, {}, self.config)
+
+    @patch('ai_players.request_text')
+    def test_exchange_reports_exact_prompt_and_raw_responses(self, request):
+        """Report each actual prompt and unmodified answer, including rejected retry responses."""
+        request.side_effect = ['bad answer', self.response]
+        events = []
+        choose_move(self.game, {}, self.config, lambda *event: events.append(event))
+        self.assertEqual([event[0] for event in events],
+                         ['sent', 'received', 'validation', 'sent', 'received'])
+        self.assertEqual(events[0][2], request.call_args_list[0].args[1])
+        self.assertEqual(events[1], ('received', 1, 'bad answer'))
+        self.assertEqual(events[3][2], request.call_args_list[1].args[1])
+        self.assertEqual(events[4], ('received', 2, self.response))
 
     @patch.dict(os.environ, {'OPENAI_API_KEY': 'test-openai', 'ANTHROPIC_API_KEY': 'test-claude'})
     @patch('ai_players.urlopen')
@@ -102,6 +123,7 @@ class AIPlayersTests(unittest.TestCase):
         ui.root = Mock()
         ui.game = self.game
         ui.ai_results = queue.Queue()
+        ui.ai_events = queue.Queue()
         ui.ai_results.put((0, START_STATE, 'e2e4', None))
         ui.ai_busy = True
         ui.ai_running = True
@@ -129,6 +151,7 @@ class AIPlayersTests(unittest.TestCase):
         ui.root = Mock()
         ui.game = self.game
         ui.ai_results = queue.Queue()
+        ui.ai_events = queue.Queue()
         ui.ai_results.put((0, START_STATE, 'e2e4', None))
         ui.ai_busy = True
         ui.ai_running = True

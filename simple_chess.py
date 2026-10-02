@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox, simpledialog
+from tkinter.scrolledtext import ScrolledText
 import argparse
 import queue
 import threading
@@ -610,35 +611,64 @@ class ChessUI:
         self.ai_generation = 0
         self.ai_plies = 0
         self.ai_results = queue.Queue()
+        self.ai_events = queue.Queue()
 
-        self.board_frame = tk.Frame(root)
+        layout = tk.Frame(root)
+        layout.pack(fill=tk.BOTH, expand=True)
+        game_panel = tk.Frame(layout)
+        game_panel.pack(side=tk.LEFT, anchor='n')
+        exchange_panel = tk.Frame(layout)
+        exchange_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+        self.exchange_label = tk.Label(exchange_panel, text='AI exchange — no request yet', anchor='w',
+                                       font=('Segoe UI', 11, 'bold'))
+        self.exchange_label.pack(fill=tk.X, pady=(0, 8))
+        self.sent_text = self.create_exchange_box(exchange_panel, 'Sent to AI')
+        self.received_text = self.create_exchange_box(exchange_panel, 'AI answer')
+
+        self.board_frame = tk.Frame(game_panel)
         self.board_frame.pack(padx=10, pady=10)
+
+        # Coordinates surround the board, with White's home rank at the bottom.
+        coordinate_style = {"font": ("Segoe UI", 11, "bold"), "fg": "#555555"}
+        for index in range(8):
+            for edge_row in (0, 9):
+                tk.Label(self.board_frame, text=FILES[index], **coordinate_style).grid(
+                    row=edge_row, column=index + 1, pady=4
+                )
+            for edge_col in (0, 9):
+                tk.Label(self.board_frame, text=str(8 - index), **coordinate_style).grid(
+                    row=index + 1, column=edge_col, padx=6
+                )
 
         self.buttons = []
         for r in range(8):
             row = []
             for c in range(8):
+                # A fixed pixel-sized frame keeps each tile square regardless of font metrics.
+                tile = tk.Frame(self.board_frame, width=80, height=80)
+                tile.grid(row=r + 1, column=c + 1)
+                tile.pack_propagate(False)
                 button = tk.Button(
-                    self.board_frame,
-                    width=4,
-                    height=2,
+                    tile,
                     font=("Segoe UI Symbol", 24),
                     command=lambda r=r, c=c: self.on_square(r, c),
                     relief=tk.FLAT,
+                    borderwidth=0,
+                    highlightthickness=0,
                 )
-                button.grid(row=r, column=c, sticky="nsew")
+                button.pack(fill=tk.BOTH, expand=True)
                 row.append(button)
             self.buttons.append(row)
 
-        self.status_label = tk.Label(root, anchor="w", font=("Segoe UI", 11))
+        self.status_label = tk.Label(game_panel, anchor="w", font=("Segoe UI", 11))
         self.status_label.pack(fill="x", padx=10)
 
-        tk.Label(root, text="Serialized state:").pack(anchor="w", padx=10, pady=(8, 0))
+        tk.Label(game_panel, text="Serialized state:").pack(anchor="w", padx=10, pady=(8, 0))
         self.state_var = tk.StringVar(value=self.state_string)
-        self.state_entry = tk.Entry(root, textvariable=self.state_var, width=80)
+        self.state_entry = tk.Entry(game_panel, textvariable=self.state_var, width=80)
         self.state_entry.pack(fill="x", padx=10, pady=(0, 8))
 
-        controls = tk.Frame(root)
+        controls = tk.Frame(game_panel)
         controls.pack(pady=(0, 10))
 
         tk.Button(controls, text="Load State", command=self.load_state).pack(
@@ -655,9 +685,27 @@ class ChessUI:
             self.ai_button = tk.Button(controls, text='Request AI Move', command=self.request_ai_move)
             self.ai_button.pack(side=tk.LEFT, padx=4)
             players = ' | '.join(f'{side.title()}: {config[side]["provider"]}' for side in ('white', 'black'))
-            tk.Label(root, text=players).pack(pady=(0, 5))
+            tk.Label(game_panel, text=players).pack(pady=(0, 5))
             self.root.after(100, self.poll_ai)
         self.refresh()
+
+    def create_exchange_box(self, parent, title):
+        """Create a scrollable, selectable, read-only text area for AI exchange details."""
+        frame = tk.LabelFrame(parent, text=title, font=('Segoe UI', 11, 'bold'))
+        frame.pack(fill=tk.BOTH, expand=True, pady=(0, 8))
+        text = ScrolledText(frame, width=52, height=18, wrap=tk.WORD,
+                            font=('Consolas', 10), state=tk.DISABLED)
+        text.pack(fill=tk.BOTH, expand=True, padx=6, pady=6)
+        return text
+
+    def update_exchange_text(self, widget, text, append=False):
+        """Replace or append exchange text while keeping it read-only for the user."""
+        widget.configure(state=tk.NORMAL)
+        if not append:
+            widget.delete('1.0', tk.END)
+        widget.insert(tk.END, text)
+        widget.configure(state=tk.DISABLED)
+        widget.see(tk.END)
 
     def on_square(self, row, col):
         """Handle human piece selection, destination clicks, promotion, and move results."""
@@ -804,13 +852,31 @@ class ChessUI:
         self.legal_targets.clear()
         self.refresh()
 
+    def drain_ai_events(self):
+        """Display queued exchange details for the current request, ignoring stale workers."""
+        # Only the UI thread touches widgets; workers publish display updates through a queue.
+        while not self.ai_events.empty():
+            generation, kind, attempt, text = self.ai_events.get_nowait()
+            if generation != self.ai_generation:
+                continue
+            heading = f'--- Attempt {attempt} ---\n'
+            if kind == 'sent':
+                self.update_exchange_text(self.sent_text, heading + text + '\n\n', append=True)
+            elif kind == 'received':
+                self.update_exchange_text(self.received_text, heading + text + '\n\n', append=True)
+            else:
+                self.update_exchange_text(self.received_text, f'{kind.title()}: {text}\n\n', append=True)
+
     def poll_ai(self):
         """Process a requested AI turn in the background, then wait for another manual request."""
+        self.drain_ai_events()
         try:
             generation, state, move, error = self.ai_results.get_nowait()
         except queue.Empty:
             pass
         else:
+            # The worker queues all exchange details before its final result.
+            self.drain_ai_events()
             self.ai_busy = False
             if self.ai_running and generation == self.ai_generation and self.game.save() == state:
                 if error:
@@ -839,14 +905,23 @@ class ChessUI:
                 generation = self.ai_generation
                 player = self.current_player().copy()
                 self.ai_busy = True
+                color = 'White' if self.game.turn == 'w' else 'Black'
+                self.exchange_label.configure(text=f'{color} — {player["provider"]} / {player["model"]}')
+                self.update_exchange_text(self.sent_text, '')
+                self.update_exchange_text(self.received_text, '')
                 self.status_label.configure(text=f'{player["provider"]} is thinking…')
+
+                def on_exchange(kind, attempt, text):
+                    """Queue the exact prompt, raw answer, or validation error for the UI thread."""
+                    self.ai_events.put((generation, kind, attempt, text))
 
                 def worker():
                     """Request a validated AI move in the background and queue its result or error."""
                     try:
-                        move = choose_move(ChessGame(state), player, self.ai_config)
+                        move = choose_move(ChessGame(state), player, self.ai_config, on_exchange)
                         self.ai_results.put((generation, state, move, None))
                     except Exception as exc:
+                        on_exchange('error', 0, str(exc))
                         self.ai_results.put((generation, state, None, str(exc)))
 
                 threading.Thread(target=worker, daemon=True).start()

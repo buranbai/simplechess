@@ -25,6 +25,12 @@ Run `python simple_chess.py` for manual play without AI configuration.
 
 The OpenAI player uses `"reasoning_effort": "low"` in the supplied config. This is sent as `reasoning.effort`; accepted effort levels depend on the selected model. Omit the setting for models without reasoning support. If OpenAI returns an incomplete or empty answer, the app displays its response status, actual stopping reason when provided, and output/reasoning token counts in the AI answer panel. It does not apply incomplete responses.
 
+## AI vs random
+
+Double-click `start_ai_vs_random.bat`, or run `py -3 simple_chess.py --config ai_vs_random.json`. This plays OpenAI as White against a local random Black player; only an OpenAI key is required. Click **Start Auto Mode** for automatic turns, or request each move manually. **Stop Auto Mode** works for both players.
+
+Use `{"provider": "random"}` for either side in any player configuration. Random players pick uniformly from the engine's available legal moves (including castling, en passant, and promotion choices), make no API calls, and need no key or model. Their legal-move list and selected move appear in the exchange panel, and their moves are recorded and saved like AI moves. You can replace the OpenAI side with your Claude configuration to test Claude against random moves.
+
 ## State exchange
 
 The AI receives its colour, current board state, last move, and legal moves. The input state uses this format:

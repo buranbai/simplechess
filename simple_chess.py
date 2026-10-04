@@ -1066,10 +1066,14 @@ class ChessUI:
                 player = self.current_player().copy()
                 self.ai_busy = True
                 color = 'White' if self.game.turn == 'w' else 'Black'
-                self.exchange_label.configure(text=f'{color} — {player["provider"]} / {player["model"]}')
+                label = f'{color} — {player["provider"]}'
+                if player.get('model') and player['provider'] != 'random':
+                    label += f' / {player["model"]}'
+                self.exchange_label.configure(text=label)
                 self.update_exchange_text(self.sent_text, '')
                 self.update_exchange_text(self.received_text, '')
-                self.status_label.configure(text=f'{player["provider"]} is thinking…')
+                self.status_label.configure(text='Choosing a local random move…' if player['provider'] == 'random'
+                                             else f'{player["provider"]} is thinking…')
 
                 def on_exchange(kind, attempt, text):
                     """Queue the exact prompt, raw answer, or validation error for the UI thread."""
@@ -1126,7 +1130,8 @@ class ChessUI:
             waiting = self.ai_busy or self.ai_running
             enabled = (not waiting and not self.auto_mode and self.current_player()['provider'] != 'human'
                        and status not in ('checkmate', 'stalemate'))
-            self.ai_button.configure(text='Thinking…' if waiting else 'Request AI Move',
+            request_label = 'Request Random Move' if self.current_player()['provider'] == 'random' else 'Request AI Move'
+            self.ai_button.configure(text='Thinking…' if waiting else request_label,
                                      state=tk.NORMAL if enabled else tk.DISABLED)
             self.auto_button.configure(text='Stop Auto Mode' if self.auto_mode else 'Start Auto Mode',
                                        state=tk.NORMAL if self.auto_mode or status not in ('checkmate', 'stalemate') else tk.DISABLED)

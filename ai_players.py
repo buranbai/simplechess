@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import random
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -29,12 +30,12 @@ def load_config(path):
             raise ValueError(f'{side}: player configuration must be a JSON object')
         provider = player.get('provider', 'human')
         player['provider'] = provider
-        if provider not in ('human', 'openai', 'anthropic'):
-            raise ValueError(f'{side}: provider must be human, openai, or anthropic')
+        if provider not in ('human', 'random', 'openai', 'anthropic'):
+            raise ValueError(f'{side}: provider must be human, random, openai, or anthropic')
         if 'reasoning_effort' in player:
             if provider != 'openai' or player['reasoning_effort'] not in ('none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'):
                 raise ValueError(f'{side}: reasoning_effort must be a supported OpenAI effort level')
-        if provider != 'human':
+        if provider in ('openai', 'anthropic'):
             if not isinstance(player.get('model'), str) or not player['model'].strip():
                 raise ValueError(f'{side}: model is required')
             key_name = player.get('api_key_env', 'OPENAI_API_KEY' if provider == 'openai' else 'ANTHROPIC_API_KEY')
@@ -121,7 +122,18 @@ def request_text(player, prompt, config):
 
 
 def choose_move(game, player, config, on_exchange=None):
-    """Request a legal AI move and optionally report prompts, responses, and retry errors."""
+    """Choose a local random move or request an AI move, reporting the exchange when requested."""
+    if player.get('provider') == 'random':
+        moves = game.legal_moves()
+        if not moves:
+            raise RuntimeError('No legal moves available for the random player')
+        if on_exchange:
+            on_exchange('sent', 1, 'Local random player — no API request.\n'
+                        f'Current state: {game.save()}\nLegal moves: {", ".join(moves)}')
+        move = random.choice(moves)
+        if on_exchange:
+            on_exchange('received', 1, move)
+        return move
     color = 'White' if game.turn == 'w' else 'Black'
     prompt = (
         f'You are playing chess as {color}. It is your turn. Choose one strong legal move.\n'

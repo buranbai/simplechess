@@ -1,0 +1,14 @@
+{
+  "white": {
+    "provider": "openai",
+    "model": "gpt-5.6-luna",
+    "api_key_env": "OPENAI_API_KEY",
+    "reasoning_effort": "low"
+  },
+  "black": { "provider": "random" },
+  "timeout_seconds": 90,
+  "max_output_tokens": 2048,
+  "attempts": 2,
+  "move_delay_ms": 500,
+  "max_plies": 300
+}

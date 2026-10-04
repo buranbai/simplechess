@@ -11,13 +11,37 @@ from simple_chess import ChessGame, ChessUI, START_STATE, moves_csv, read_saved_
 
 
 class AIPlayersTests(unittest.TestCase):
+    @patch('ai_players.request_text')
+    def test_random_player_uses_local_legal_moves(self, request):
+        """Choose random legal moves for both colours without any provider request."""
+        game = ChessGame()
+        for _ in range(8):
+            state = game.save()
+            legal = game.legal_moves()
+            events = []
+            move = choose_move(game, {'provider': 'random'}, {}, lambda *event: events.append(event))
+            self.assertIn(move, legal)
+            self.assertEqual(game.save(), state)
+            self.assertIn('no API request', events[0][2])
+            self.assertEqual(events[1], ('received', 1, move))
+            self.assertTrue(game.move(move[:2], move[2:4], move[4:] or None)[0])
+        request.assert_not_called()
+
+    @patch.dict(os.environ, {}, clear=True)
+    def test_random_config_needs_no_key_or_model(self):
+        """Allow random players to load without credentials or model settings."""
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'config.json'
+            path.write_text(json.dumps({'white': {'provider': 'random'}, 'black': {'provider': 'random'}}))
+            self.assertEqual(load_config(path)['white']['provider'], 'random')
+
     def test_auto_mode_continues_and_stop_discards_pending_move(self):
         """Continue after an AI move, then stop without applying a pending opponent response."""
         ui = ChessUI.__new__(ChessUI)
         ui.root = Mock()
         ui.game = ChessGame()
         ui.ai_config = {'white': {'provider': 'openai', 'model': 'test'},
-                        'black': {'provider': 'anthropic', 'model': 'test'},
+                        'black': {'provider': 'random'},
                         'max_plies': 300, 'move_delay_ms': 1000}
         ui.auto_mode = True
         ui.ai_running = True

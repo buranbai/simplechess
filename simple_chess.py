@@ -1,7 +1,12 @@
 import tkinter as tk
-from tkinter import messagebox, simpledialog
+from tkinter import messagebox, simpledialog, filedialog
 from tkinter.scrolledtext import ScrolledText
+from tkinter import ttk
 import argparse
+import csv
+import io
+import json
+import re
 import queue
 import threading
 from pathlib import Path
@@ -59,6 +64,44 @@ def piece_color(piece):
 def other(color):
     """Return the opposing player's colour."""
     return "b" if color == "w" else "w"
+
+
+def moves_csv(history):
+    """Format numbered White/Black move history as a CSV readable by spreadsheet apps."""
+    output = io.StringIO(newline='')
+    writer = csv.writer(output)
+    writer.writerow(['Move', 'White', 'Black'])
+    writer.writerows(history)
+    return output.getvalue()
+
+
+def read_saved_game(text):
+    """Read a JSON game with optional move history, or a plain serialized board state."""
+    text = text.lstrip('\ufeff').strip()
+    if not text.startswith('{'):
+        return ChessGame(text), []
+    data = json.loads(text)
+    if not isinstance(data.get('state'), str):
+        raise ValueError('Saved game must contain a board state string')
+    game = ChessGame(data['state'])
+    history = data.get('moves', [])
+    if not isinstance(history, list):
+        raise ValueError('Move history must be a list')
+    for number, row in enumerate(history, 1):
+        if (not isinstance(row, list) or len(row) != 3 or type(row[0]) is not int
+                or row[0] != number):
+            raise ValueError('History rows must contain a move number, White move, and Black move')
+        for move in row[1:]:
+            if not isinstance(move, str) or (move and not re.fullmatch(r'[a-h][1-8][a-h][1-8][qrbn]?', move)):
+                raise ValueError('History contains an invalid UCI move')
+        if (not any(row[1:]) or (number > 1 and not row[1])
+                or (number < len(history) and not row[2])):
+            raise ValueError('History contains missing moves')
+    if history:
+        last = history[-1]
+        if game.last_move != (last[2] or last[1]) or game.turn != ('w' if last[2] else 'b'):
+            raise ValueError('History last move does not match the board state')
+    return game, history
 
 
 class ChessGame:
@@ -612,6 +655,7 @@ class ChessUI:
         self.ai_plies = 0
         self.ai_results = queue.Queue()
         self.ai_events = queue.Queue()
+        self.move_history = []
 
         layout = tk.Frame(root)
         layout.pack(fill=tk.BOTH, expand=True)
@@ -624,6 +668,17 @@ class ChessUI:
         self.exchange_label.pack(fill=tk.X, pady=(0, 8))
         self.sent_text = self.create_exchange_box(exchange_panel, 'Sent to AI')
         self.received_text = self.create_exchange_box(exchange_panel, 'AI answer')
+        history_frame = tk.LabelFrame(exchange_panel, text='Move history', font=('Segoe UI', 11, 'bold'))
+        history_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 8))
+        self.history_table = ttk.Treeview(history_frame, columns=('number', 'white', 'black'),
+                                          show='headings', height=8)
+        for column, title, width in (('number', 'Move', 55), ('white', 'White', 150), ('black', 'Black', 150)):
+            self.history_table.heading(column, text=title)
+            self.history_table.column(column, width=width, anchor=tk.CENTER)
+        history_scroll = ttk.Scrollbar(history_frame, orient=tk.VERTICAL, command=self.history_table.yview)
+        history_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.history_table.configure(yscrollcommand=history_scroll.set)
+        self.history_table.pack(fill=tk.BOTH, expand=True, padx=6, pady=6)
 
         self.board_frame = tk.Frame(game_panel)
         self.board_frame.pack(padx=10, pady=10)
@@ -680,6 +735,11 @@ class ChessUI:
         tk.Button(controls, text="Copy State", command=self.copy_state).pack(
             side=tk.LEFT, padx=4
         )
+        file_controls = tk.Frame(game_panel)
+        file_controls.pack(pady=(0, 10))
+        for label, command in (('Save Game', self.save_game), ('Load Game', self.load_game),
+                               ('Export Moves', self.export_moves)):
+            tk.Button(file_controls, text=label, command=command).pack(side=tk.LEFT, padx=4)
 
         if config:
             self.ai_button = tk.Button(controls, text='Request AI Move', command=self.request_ai_move)
@@ -693,7 +753,7 @@ class ChessUI:
         """Create a scrollable, selectable, read-only text area for AI exchange details."""
         frame = tk.LabelFrame(parent, text=title, font=('Segoe UI', 11, 'bold'))
         frame.pack(fill=tk.BOTH, expand=True, pady=(0, 8))
-        text = ScrolledText(frame, width=52, height=18, wrap=tk.WORD,
+        text = ScrolledText(frame, width=52, height=12, wrap=tk.WORD,
                             font=('Consolas', 10), state=tk.DISABLED)
         text.pack(fill=tk.BOTH, expand=True, padx=6, pady=6)
         return text
@@ -706,6 +766,78 @@ class ChessUI:
         widget.insert(tk.END, text)
         widget.configure(state=tk.DISABLED)
         widget.see(tk.END)
+
+    def record_move(self):
+        """Record the last successful move in numbered White/Black columns and scroll to it."""
+        color = other(self.game.turn)
+        move = self.game.last_move
+        if color == 'w' or not self.move_history or self.move_history[-1][2]:
+            self.move_history.append([len(self.move_history) + 1, '', ''])
+            self.history_table.insert('', tk.END, iid=str(len(self.move_history)),
+                                      values=self.move_history[-1])
+        self.move_history[-1][1 if color == 'w' else 2] = move
+        item = str(len(self.move_history))
+        self.history_table.item(item, values=self.move_history[-1])
+        self.history_table.see(item)
+
+    def clear_move_history(self):
+        """Clear recorded moves when a new game or loaded position starts."""
+        self.move_history.clear()
+        for item in self.history_table.get_children():
+            self.history_table.delete(item)
+
+    def save_game(self):
+        """Save the current board and history as JSON and export a companion moves CSV."""
+        name = filedialog.asksaveasfilename(parent=self.root, title='Save Game',
+                                           defaultextension='.json', filetypes=[('Saved game', '*.json')])
+        if not name:
+            return
+        path = Path(name)
+        try:
+            data = {'state': self.game.save(), 'moves': self.move_history}
+            path.write_text(json.dumps(data, indent=2) + '\n', encoding='utf-8')
+            csv_path = path.with_name(path.stem + '.moves.csv')
+            csv_path.write_text(moves_csv(self.move_history), encoding='utf-8')
+            messagebox.showinfo('Game saved', f'Game: {path}\nMoves: {csv_path}', parent=self.root)
+        except OSError as exc:
+            messagebox.showerror('Save failed', str(exc), parent=self.root)
+
+    def export_moves(self):
+        """Export the current numbered move history to a user-selected CSV file."""
+        name = filedialog.asksaveasfilename(parent=self.root, title='Export Moves',
+                                           defaultextension='.csv', filetypes=[('Move history', '*.csv')])
+        if not name:
+            return
+        try:
+            Path(name).write_text(moves_csv(self.move_history), encoding='utf-8')
+        except OSError as exc:
+            messagebox.showerror('Export failed', str(exc), parent=self.root)
+
+    def load_game(self):
+        """Load a saved board with optional history, pausing AI and replacing the current game."""
+        name = filedialog.askopenfilename(parent=self.root, title='Load Game',
+                                         filetypes=[('Game or board state', '*.json *.txt'), ('All files', '*.*')])
+        if not name:
+            return
+        try:
+            game, history = read_saved_game(Path(name).read_text(encoding='utf-8-sig'))
+        except (OSError, ValueError) as exc:
+            messagebox.showerror('Load failed', str(exc), parent=self.root)
+            return
+        self.stop_ai()
+        self.game = game
+        self.clear_move_history()
+        self.move_history = history
+        for row in history:
+            self.history_table.insert('', tk.END, iid=str(row[0]), values=row)
+        if history:
+            self.history_table.see(str(history[-1][0]))
+        self.ai_plies = 0
+        self.state_string = game.save()
+        self.state_var.set(self.state_string)
+        self.selected = None
+        self.legal_targets.clear()
+        self.refresh()
 
     def on_square(self, row, col):
         """Handle human piece selection, destination clicks, promotion, and move results."""
@@ -745,7 +877,8 @@ class ChessUI:
         if not ok:
             messagebox.showerror("Illegal move", reason)
         else:
-            # This is the only persisted game data.
+            self.record_move()
+            # Keep the compact board state synchronized with the displayed game.
             self.state_string = self.game.save()
             self.state_var.set(self.state_string)
 
@@ -805,6 +938,7 @@ class ChessUI:
             game = ChessGame(text)
             self.stop_ai()
             self.game = game
+            self.clear_move_history()
             self.ai_plies = 0
             self.state_string = self.game.save()
             self.state_var.set(self.state_string)
@@ -819,6 +953,7 @@ class ChessUI:
         self.stop_ai()
         self.ai_plies = 0
         self.game = ChessGame(START_STATE)
+        self.clear_move_history()
         self.state_string = self.game.save()
         self.state_var.set(self.state_string)
         self.selected = None
@@ -888,6 +1023,7 @@ class ChessUI:
                         self.stop_ai()
                         messagebox.showerror('AI paused', reason)
                     else:
+                        self.record_move()
                         self.ai_plies += 1
                         self.state_string = self.game.save()
                         self.state_var.set(self.state_string)

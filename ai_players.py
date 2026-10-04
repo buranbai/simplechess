@@ -31,6 +31,9 @@ def load_config(path):
         player['provider'] = provider
         if provider not in ('human', 'openai', 'anthropic'):
             raise ValueError(f'{side}: provider must be human, openai, or anthropic')
+        if 'reasoning_effort' in player:
+            if provider != 'openai' or player['reasoning_effort'] not in ('none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'):
+                raise ValueError(f'{side}: reasoning_effort must be a supported OpenAI effort level')
         if provider != 'human':
             if not isinstance(player.get('model'), str) or not player['model'].strip():
                 raise ValueError(f'{side}: model is required')
@@ -75,6 +78,8 @@ def request_text(player, prompt, config):
         headers['Authorization'] = f'Bearer {key}'
         payload = {'model': player['model'], 'input': prompt,
                    'max_output_tokens': config['max_output_tokens'], 'store': False}
+        if 'reasoning_effort' in player:
+            payload['reasoning'] = {'effort': player['reasoning_effort']}
     else:
         url = 'https://api.anthropic.com/v1/messages'
         headers.update({'x-api-key': key, 'anthropic-version': '2023-06-01'})
@@ -93,11 +98,25 @@ def request_text(player, prompt, config):
         text = ''.join(part.get('text', '') for item in data.get('output', [])
                        if item.get('type') == 'message' for part in item.get('content', [])
                        if part.get('type') == 'output_text')
+        if data.get('status') in ('incomplete', 'failed') or not text.strip():
+            status = data.get('status', 'not reported')
+            reason = (data.get('incomplete_details') or {}).get('reason')
+            error_code = (data.get('error') or {}).get('code')
+            refusals = [part.get('refusal') for item in data.get('output', [])
+                        for part in item.get('content', []) if part.get('type') == 'refusal']
+            reason = reason or error_code or ('refusal' if refusals else 'not reported')
+            usage = data.get('usage') or {}
+            tokens = usage.get('output_tokens', 'not reported')
+            reasoning = (usage.get('output_tokens_details') or {}).get('reasoning_tokens', 'not reported')
+            hint = ('; the token budget includes hidden reasoning and the visible move'
+                    if reason == 'max_output_tokens' else '')
+            raise RuntimeError(f'openai returned no complete move: status={status}; stopping reason={reason}; '
+                               f'output tokens={tokens}; reasoning tokens={reasoning}{hint}')
     else:
         text = ''.join(part.get('text', '') for part in data.get('content', [])
                        if part.get('type') == 'text')
     if not text.strip():
-        raise RuntimeError(f'{provider} returned no text; try increasing max_output_tokens')
+        raise RuntimeError(f'{provider} returned no text; stopping reason={data.get("stop_reason") or "not reported"}')
     return text
 
 

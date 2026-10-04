@@ -11,11 +11,17 @@ A Tkinter chess game with configurable OpenAI, Claude, or human players. No extr
 
 The right panel shows the exact prompt sent to the AI at the top and its raw text answer at the bottom. Each new move replaces the previous exchange; retries and errors are shown for that request. You can select and copy the text. API keys and authentication headers are not included.
 
+The move-history table records every successful human or AI move in numbered White/Black columns using UCI notation. Reset and Load State clear the history. A loaded state contains only its last move, so earlier moves cannot be reconstructed; the table records moves played after loading.
+
+**Save Game** writes the current board and move history to a JSON file and also exports a companion `.moves.csv` file. **Export Moves** saves just the history as CSV. **Load Game** restores a JSON game including its moves, or loads a plain board-state text file with an empty history. JSON files containing only `{"state": "..."}` also load with an empty history. Loaded history is checked for valid move notation and agreement with the board's last move; earlier moves are not replayed. Moves played after loading are appended to the restored history.
+
 The request button is disabled while the AI is thinking, on a human turn, and when the game is over. Reset and Load State discard pending results. A request already sent can still finish and incur charges. After an API error, fix the issue and click **Request AI Move** to retry. Restart the app after changing configuration or credentials.
 
 Each requested AI move uses a paid API request. `attempts` limits retries for invalid responses; `timeout_seconds`, `max_output_tokens`, and `max_plies` bound requests and play. The legacy `move_delay_ms` setting is unused in manual request mode. The move limit counts AI moves and resets on Reset or Load State. The engine detects checkmate and stalemate, but does not implement repetition, fifty-move, or insufficient-material draws.
 
 Run `python simple_chess.py` for manual play without AI configuration.
+
+The OpenAI player uses `"reasoning_effort": "low"` in the supplied config. This is sent as `reasoning.effort`; accepted effort levels depend on the selected model. Omit the setting for models without reasoning support. If OpenAI returns an incomplete or empty answer, the app displays its response status, actual stopping reason when provided, and output/reasoning token counts in the AI answer panel. It does not apply incomplete responses.
 
 ## State exchange
 

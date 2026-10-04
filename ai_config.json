@@ -2,7 +2,8 @@
   "white": {
     "provider": "openai",
     "model": "gpt-5.6-luna",
-    "api_key_env": "OPENAI_API_KEY"
+    "api_key_env": "OPENAI_API_KEY",
+    "reasoning_effort": "low"
   },
   "black": {
     "provider": "anthropic",
@@ -15,4 +16,3 @@
   "move_delay_ms": 500,
   "max_plies": 300
 }
-

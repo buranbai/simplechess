@@ -7,10 +7,27 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from ai_players import choose_move, load_config, request_text, validated_move
-from simple_chess import ChessGame, ChessUI, START_STATE
+from simple_chess import ChessGame, ChessUI, START_STATE, moves_csv, read_saved_game
 
 
 class AIPlayersTests(unittest.TestCase):
+    def test_save_format_and_board_only_load(self):
+        """Restore state and moves together, allow board-only loading, and reject broken history."""
+        game = ChessGame()
+        game.move('e2', 'e4')
+        history = [[1, 'e2e4', '']]
+        restored, moves = read_saved_game(json.dumps({'state': game.save(), 'moves': history}))
+        self.assertEqual(restored.save(), game.save())
+        self.assertEqual(moves, history)
+        for text in (game.save(), json.dumps({'state': game.save()})):
+            restored, moves = read_saved_game(text)
+            self.assertEqual(restored.save(), game.save())
+            self.assertEqual(moves, [])
+        self.assertEqual(moves_csv(history), 'Move,White,Black\r\n1,e2e4,\r\n')
+        for bad in ([[1, 'invalid', '']], [[1, 'd2d4', '']], [[2, 'e2e4', '']]):
+            with self.assertRaises(ValueError):
+                read_saved_game(json.dumps({'state': game.save(), 'moves': bad}))
+
     def setUp(self):
         """Prepare a starting game, a valid example response, and shared request settings."""
         self.game = ChessGame()
@@ -87,17 +104,39 @@ class AIPlayersTests(unittest.TestCase):
             stream = Mock()
             stream.read.return_value = json.dumps(response)
             urlopen.return_value.__enter__.return_value = stream
-            self.assertEqual(request_text({'provider': provider, 'model': 'test-model'}, 'prompt', self.config), self.response)
+            player = {'provider': provider, 'model': 'test-model'}
+            if provider == 'openai':
+                player['reasoning_effort'] = 'low'
+            self.assertEqual(request_text(player, 'prompt', self.config), self.response)
             request = urlopen.call_args.args[0]
             payload = json.loads(request.data)
             self.assertEqual(payload['model'], 'test-model')
             self.assertEqual(urlopen.call_args.kwargs['timeout'], 10)
             if provider == 'openai':
+                self.assertEqual(payload['reasoning'], {'effort': 'low'})
                 self.assertEqual(payload['input'], 'prompt')
                 self.assertEqual(request.get_header('Authorization'), 'Bearer test-openai')
             else:
                 self.assertEqual(payload['messages'][0]['content'], 'prompt')
                 self.assertEqual(request.get_header('X-api-key'), 'test-claude')
+
+    @patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'})
+    @patch('ai_players.urlopen')
+    def test_openai_stopping_reason(self, urlopen):
+        """Report actual stop details and token counts without accepting a truncated move."""
+        response = {'status': 'incomplete', 'incomplete_details': {'reason': 'max_output_tokens'},
+                    'usage': {'output_tokens': 2048, 'output_tokens_details': {'reasoning_tokens': 2048}},
+                    'output': []}
+        stream = Mock()
+        urlopen.return_value.__enter__.return_value = stream
+        for output in ([], [{'type': 'message', 'content': [{'type': 'output_text', 'text': 'e2e4'}]}]):
+            response['output'] = output
+            stream.read.return_value = json.dumps(response)
+            with self.assertRaisesRegex(RuntimeError, 'stopping reason=max_output_tokens; output tokens=2048; reasoning tokens=2048'):
+                request_text({'provider': 'openai', 'model': 'test'}, 'prompt', self.config)
+        stream.read.return_value = json.dumps({'status': 'completed', 'output': []})
+        with self.assertRaisesRegex(RuntimeError, 'stopping reason=not reported'):
+            request_text({'provider': 'openai', 'model': 'test'}, 'prompt', self.config)
 
     @patch.dict(os.environ, {}, clear=True)
     def test_config_and_secrets(self):
@@ -160,6 +199,7 @@ class AIPlayersTests(unittest.TestCase):
         ui.ai_config = {'white': {'provider': 'openai'}, 'black': {'provider': 'anthropic'}, 'max_plies': 300}
         ui.ai_button = Mock()
         ui.state_var = Mock()
+        ui.record_move = Mock()
         ui.refresh = Mock()
         with patch('simple_chess.threading.Thread') as thread:
             ui.poll_ai()
@@ -170,6 +210,24 @@ class AIPlayersTests(unittest.TestCase):
         self.assertFalse(ui.ai_running)
         self.assertFalse(ui.ai_busy)
         self.assertEqual(ui.ai_plies, 1)
+        ui.record_move.assert_called_once()
+
+    def test_move_history_groups_turns_and_clears(self):
+        """Record numbered opening moves and handle history beginning with Black."""
+        ui = ChessUI.__new__(ChessUI)
+        ui.game = ChessGame()
+        ui.move_history = []
+        ui.history_table = Mock()
+        for move in ('e2e4', 'e7e5', 'g1f3'):
+            self.assertTrue(ui.game.move(move[:2], move[2:])[0])
+            ui.record_move()
+        self.assertEqual(ui.move_history, [[1, 'e2e4', 'e7e5'], [2, 'g1f3', '']])
+        ui.history_table.get_children.return_value = ('1', '2')
+        ui.clear_move_history()
+        self.assertEqual(ui.move_history, [])
+        self.assertTrue(ui.game.move('b8', 'c6')[0])
+        ui.record_move()
+        self.assertEqual(ui.move_history, [[1, '', 'b8c6']])
 
     def test_request_ignores_duplicate_clicks_and_human_turns(self):
         """Ensure manual requests cannot queue duplicate moves or request a human player's turn."""

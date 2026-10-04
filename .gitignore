@@ -219,3 +219,7 @@ __marimo__/
 
 # Local AI credentials
 .env
+
+
+# Local files
+saves/

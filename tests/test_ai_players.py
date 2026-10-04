@@ -11,6 +11,52 @@ from simple_chess import ChessGame, ChessUI, START_STATE, moves_csv, read_saved_
 
 
 class AIPlayersTests(unittest.TestCase):
+    def test_auto_mode_continues_and_stop_discards_pending_move(self):
+        """Continue after an AI move, then stop without applying a pending opponent response."""
+        ui = ChessUI.__new__(ChessUI)
+        ui.root = Mock()
+        ui.game = ChessGame()
+        ui.ai_config = {'white': {'provider': 'openai', 'model': 'test'},
+                        'black': {'provider': 'anthropic', 'model': 'test'},
+                        'max_plies': 300, 'move_delay_ms': 1000}
+        ui.auto_mode = True
+        ui.ai_running = True
+        ui.ai_busy = True
+        ui.ai_generation = 0
+        ui.ai_plies = 0
+        ui.ai_results = queue.Queue()
+        ui.ai_events = queue.Queue()
+        ui.ai_button = Mock()
+        ui.auto_button = Mock()
+        ui.exchange_label = Mock()
+        ui.status_label = Mock()
+        ui.state_var = Mock()
+        ui.record_move = Mock()
+        ui.refresh = Mock()
+        ui.update_exchange_text = Mock()
+        ui.sent_text = Mock()
+        ui.received_text = Mock()
+        ui.selected = None
+        ui.legal_targets = set()
+        ui.ai_results.put((0, START_STATE, 'e2e4', None))
+        with patch('simple_chess.time.monotonic', return_value=10), patch('simple_chess.threading.Thread') as thread:
+            ui.poll_ai()
+            self.assertTrue(ui.auto_mode)
+            self.assertEqual(ui.next_auto_move_at, 11)
+            thread.assert_not_called()
+        with patch('simple_chess.time.monotonic', return_value=12), patch('simple_chess.threading.Thread') as thread:
+            ui.poll_ai()
+            thread.assert_called_once()
+            self.assertTrue(ui.ai_busy)
+        state = ui.game.save()
+        ui.toggle_auto_mode()
+        self.assertFalse(ui.auto_mode)
+        ui.ai_results.put((0, state, 'e7e5', None))
+        with patch('simple_chess.threading.Thread') as thread:
+            ui.poll_ai()
+            thread.assert_not_called()
+        self.assertEqual(ui.game.save(), state)
+
     def test_save_format_and_board_only_load(self):
         """Restore state and moves together, allow board-only loading, and reject broken history."""
         game = ChessGame()

@@ -21,6 +21,8 @@ Each requested AI move uses a paid API request. `attempts` limits retries for in
 
 Run `python simple_chess.py` for manual play without AI configuration.
 
+**Start Auto Mode** requests and plays successive AI moves. **Stop Auto Mode** stops further requests and discards any pending move (already sent requests may still incur charges). Automatic play waits on human turns and resumes after the human moves. Reset, Load State, Load Game, API errors, game over, and the AI move limit stop automatic play. `move_delay_ms` controls the pause between AI turns; it has no effect on manual requests.
+
 The OpenAI player uses `"reasoning_effort": "low"` in the supplied config. This is sent as `reasoning.effort`; accepted effort levels depend on the selected model. Omit the setting for models without reasoning support. If OpenAI returns an incomplete or empty answer, the app displays its response status, actual stopping reason when provided, and output/reasoning token counts in the AI answer panel. It does not apply incomplete responses.
 
 ## State exchange

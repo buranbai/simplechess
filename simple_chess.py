@@ -9,6 +9,7 @@ import json
 import re
 import queue
 import threading
+import time
 from pathlib import Path
 from ai_players import choose_move, load_config
 
@@ -650,6 +651,8 @@ class ChessUI:
         self.legal_targets = set()
         self.ai_config = config
         self.ai_running = False
+        self.auto_mode = False
+        self.next_auto_move_at = 0
         self.ai_busy = False
         self.ai_generation = 0
         self.ai_plies = 0
@@ -744,6 +747,8 @@ class ChessUI:
         if config:
             self.ai_button = tk.Button(controls, text='Request AI Move', command=self.request_ai_move)
             self.ai_button.pack(side=tk.LEFT, padx=4)
+            self.auto_button = tk.Button(controls, text='Start Auto Mode', command=self.toggle_auto_mode)
+            self.auto_button.pack(side=tk.LEFT, padx=4)
             players = ' | '.join(f'{side.title()}: {config[side]["provider"]}' for side in ('white', 'black'))
             tk.Label(game_panel, text=players).pack(pady=(0, 5))
             self.root.after(100, self.poll_ai)
@@ -970,11 +975,23 @@ class ChessUI:
         return self.ai_config['white' if self.game.turn == 'w' else 'black']
 
     def stop_ai(self):
-        """Clear the requested AI turn and invalidate pending results without cancelling sent requests."""
+        """Stop automatic play and invalidate pending turns without cancelling sent requests."""
         self.ai_running = False
+        self.auto_mode = False
         self.ai_generation += 1
         if self.ai_config:
             self.ai_button.configure(text='Request AI Move')
+        if hasattr(self, 'auto_button'):
+            self.auto_button.configure(text='Start Auto Mode')
+
+    def toggle_auto_mode(self):
+        """Start automatic AI turns or stop immediately and discard any pending move."""
+        if self.auto_mode:
+            self.stop_ai()
+        elif self.game.status() not in ('checkmate', 'stalemate'):
+            self.auto_mode = True
+            self.next_auto_move_at = 0
+        self.refresh()
 
     def request_ai_move(self):
         """Request exactly one AI turn when the current side is AI and no request is pending."""
@@ -1003,7 +1020,7 @@ class ChessUI:
                 self.update_exchange_text(self.received_text, f'{kind.title()}: {text}\n\n', append=True)
 
     def poll_ai(self):
-        """Process a requested AI turn in the background, then wait for another manual request."""
+        """Process background moves and request further AI turns when automatic play is enabled."""
         self.drain_ai_events()
         try:
             generation, state, move, error = self.ai_results.get_nowait()
@@ -1027,8 +1044,15 @@ class ChessUI:
                         self.ai_plies += 1
                         self.state_string = self.game.save()
                         self.state_var.set(self.state_string)
-                self.stop_ai()
+                self.ai_running = False
+                self.next_auto_move_at = time.monotonic() + self.ai_config.get('move_delay_ms', 500) / 1000
             self.refresh()
+        if getattr(self, 'auto_mode', False) and not self.ai_busy and not self.ai_running:
+            if self.game.status() in ('checkmate', 'stalemate'):
+                self.stop_ai()
+                self.refresh()
+            elif time.monotonic() >= self.next_auto_move_at and self.current_player()['provider'] != 'human':
+                self.request_ai_move()
         if self.ai_running and not self.ai_busy:
             if self.game.status() in ('checkmate', 'stalemate'):
                 self.stop_ai()
@@ -1100,10 +1124,12 @@ class ChessUI:
         self.status_label.configure(text=text)
         if self.ai_config:
             waiting = self.ai_busy or self.ai_running
-            enabled = (not waiting and self.current_player()['provider'] != 'human'
+            enabled = (not waiting and not self.auto_mode and self.current_player()['provider'] != 'human'
                        and status not in ('checkmate', 'stalemate'))
             self.ai_button.configure(text='Thinking…' if waiting else 'Request AI Move',
                                      state=tk.NORMAL if enabled else tk.DISABLED)
+            self.auto_button.configure(text='Stop Auto Mode' if self.auto_mode else 'Start Auto Mode',
+                                       state=tk.NORMAL if self.auto_mode or status not in ('checkmate', 'stalemate') else tk.DISABLED)
 
 
 def run_tests():

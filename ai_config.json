@@ -11,7 +11,7 @@
     "api_key_env": "ANTHROPIC_API_KEY"
   },
   "timeout_seconds": 90,
-  "max_output_tokens": 2048,
+  "max_output_tokens": 8192,
   "attempts": 2,
   "move_delay_ms": 500,
   "max_plies": 300

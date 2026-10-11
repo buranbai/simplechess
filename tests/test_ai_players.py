@@ -11,6 +11,40 @@ from simple_chess import ChessGame, ChessUI, START_STATE, moves_csv, read_saved_
 
 
 class AIPlayersTests(unittest.TestCase):
+    def test_animations_finish_and_reset_cancels_frames(self):
+        """Exercise movement, capture, castling, promotion, and en-passant animation cleanup."""
+        import tkinter as tk
+        root = tk.Tk()
+        root.withdraw()
+        try:
+            ui = ChessUI(root)
+            cases = [(START_STATE, 'e2e4'),
+                     ('7k/8/8/8/3p4/4P3/8/7K w - -;-', 'e3d4'),
+                     ('r3k2r/8/8/8/8/8/8/R3K2R w KQkq -;-', 'e1g1'),
+                     ('7k/P7/8/8/8/8/8/7K w - -;-', 'a7a8q'),
+                     ('7k/8/8/3pP3/8/8/8/7K w - d6;d7d5', 'e5d6')]
+            for state, move in cases:
+                ui.game = ChessGame(state)
+                before = [row[:] for row in ui.game.board]
+                self.assertTrue(ui.game.move(move[:2], move[2:4], move[4:] or None)[0])
+                with patch.object(root, 'after') as schedule, patch('simple_chess.time.monotonic', return_value=0):
+                    ui.animate_move(before, move)
+                    self.assertTrue(ui.animating)
+                    callback = schedule.call_args.args[1]
+                    with patch('simple_chess.time.monotonic', return_value=1):
+                        callback()
+                    self.assertFalse(ui.animating)
+                    self.assertIsNone(ui.animation_canvas)
+            ui.game = ChessGame()
+            before = [row[:] for row in ui.game.board]
+            ui.game.move('e2', 'e4')
+            ui.animate_move(before, 'e2e4')
+            ui.reset()
+            self.assertFalse(ui.animating)
+            self.assertEqual(ui.game.save(), START_STATE)
+        finally:
+            root.destroy()
+
     @patch('ai_players.request_text')
     def test_random_player_uses_local_legal_moves(self, request):
         """Choose random legal moves for both colours without any provider request."""
@@ -56,6 +90,7 @@ class AIPlayersTests(unittest.TestCase):
         ui.status_label = Mock()
         ui.state_var = Mock()
         ui.record_move = Mock()
+        ui.animate_move = Mock()
         ui.refresh = Mock()
         ui.update_exchange_text = Mock()
         ui.sent_text = Mock()
@@ -146,6 +181,12 @@ class AIPlayersTests(unittest.TestCase):
         self.assertIn('e2e4', prompt)
         self.assertIn('Return ONLY one move', prompt)
         self.assertEqual(request.call_count, 2)
+        retry_prompt = request.call_args_list[1].args[1]
+        self.assertIn('You sent an invalid move', retry_prompt)
+        self.assertIn('Your previous response was: "bad"', retry_prompt)
+        self.assertIn('pick ONLY one move from the available legal moves', retry_prompt)
+        self.assertIn('Available legal moves: ' + ', '.join(self.game.legal_moves()), retry_prompt)
+        self.assertEqual(self.game.save(), START_STATE)
         request.side_effect = ['bad', 'bad']
         with self.assertRaises(RuntimeError):
             choose_move(self.game, {}, self.config)
@@ -175,8 +216,7 @@ class AIPlayersTests(unittest.TestCase):
             stream.read.return_value = json.dumps(response)
             urlopen.return_value.__enter__.return_value = stream
             player = {'provider': provider, 'model': 'test-model'}
-            if provider == 'openai':
-                player['reasoning_effort'] = 'low'
+            player['reasoning_effort'] = 'low'
             self.assertEqual(request_text(player, 'prompt', self.config), self.response)
             request = urlopen.call_args.args[0]
             payload = json.loads(request.data)
@@ -187,6 +227,8 @@ class AIPlayersTests(unittest.TestCase):
                 self.assertEqual(payload['input'], 'prompt')
                 self.assertEqual(request.get_header('Authorization'), 'Bearer test-openai')
             else:
+                self.assertEqual(payload['output_config'], {'effort': 'low'})
+                self.assertNotIn('reasoning', payload)
                 self.assertEqual(payload['messages'][0]['content'], 'prompt')
                 self.assertEqual(request.get_header('X-api-key'), 'test-claude')
 
@@ -270,6 +312,7 @@ class AIPlayersTests(unittest.TestCase):
         ui.ai_button = Mock()
         ui.state_var = Mock()
         ui.record_move = Mock()
+        ui.animate_move = Mock()
         ui.refresh = Mock()
         with patch('simple_chess.threading.Thread') as thread:
             ui.poll_ai()

@@ -1,0 +1,17 @@
+{
+  "timeout_seconds": 90,
+  "max_output_tokens": 8192,
+  "attempts": 2,
+  "move_delay_ms": 500,
+  "max_plies": 300,
+  "white": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "reasoning_effort": "medium"
+  },
+  "black": {
+    "provider": "openai",
+    "model": "gpt-5.6-luna",
+    "reasoning_effort": "medium"
+  }
+}

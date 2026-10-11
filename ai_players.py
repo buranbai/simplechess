@@ -8,7 +8,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
-def load_config(path):
+def load_config(path, settings=None):
     """Load local credentials and validate player settings and request limits from JSON."""
     path = Path(path).resolve()
     # Optional local secrets file; existing environment values take precedence.
@@ -21,7 +21,7 @@ def load_config(path):
                 key = key.strip()
                 if not os.environ.get(key):
                     os.environ[key] = value.strip().strip('"\'')
-    config = json.loads(path.read_text(encoding='utf-8'))
+    config = json.loads(path.read_text(encoding='utf-8')) if settings is None else settings
     if not isinstance(config, dict):
         raise ValueError('Configuration must be a JSON object')
     for side in ('white', 'black'):
@@ -33,8 +33,10 @@ def load_config(path):
         if provider not in ('human', 'random', 'openai', 'anthropic'):
             raise ValueError(f'{side}: provider must be human, random, openai, or anthropic')
         if 'reasoning_effort' in player:
-            if provider != 'openai' or player['reasoning_effort'] not in ('none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'):
-                raise ValueError(f'{side}: reasoning_effort must be a supported OpenAI effort level')
+            levels = {'openai': ('none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'),
+                      'anthropic': ('low', 'medium', 'high', 'xhigh', 'max')}
+            if player['reasoning_effort'] not in levels.get(provider, ()):
+                raise ValueError(f'{side}: reasoning_effort must be a supported {provider} effort level')
         if provider in ('openai', 'anthropic'):
             if not isinstance(player.get('model'), str) or not player['model'].strip():
                 raise ValueError(f'{side}: model is required')
@@ -86,6 +88,8 @@ def request_text(player, prompt, config):
         headers.update({'x-api-key': key, 'anthropic-version': '2023-06-01'})
         payload = {'model': player['model'], 'max_tokens': config['max_output_tokens'],
                    'messages': [{'role': 'user', 'content': prompt}]}
+        if 'reasoning_effort' in player:
+            payload['output_config'] = {'effort': player['reasoning_effort']}
     request = Request(url, data=json.dumps(payload).encode('utf-8'), headers=headers)
     try:
         with urlopen(request, timeout=config['timeout_seconds']) as result:
@@ -160,4 +164,10 @@ def choose_move(game, player, config, on_exchange=None):
                 on_exchange('validation', attempt + 1, str(exc))
             if attempt + 1 == config['attempts']:
                 raise RuntimeError(f'AI response rejected: {exc}') from None
-            prompt += f'\nYour previous response was invalid: {exc}. Try again using the original current state.'
+            prompt += (
+                f'\nYou sent an invalid move. Your previous response was: {json.dumps(response)}. '
+                f'Reason: {exc}. The board has not changed. '
+                'You must pick ONLY one move from the available legal moves listed below. '
+                'Return exactly that UCI move, with no other text.\n'
+                f'Available legal moves: {", ".join(game.legal_moves())}'
+            )

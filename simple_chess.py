@@ -10,6 +10,7 @@ import re
 import queue
 import threading
 import time
+import math
 from pathlib import Path
 from ai_players import choose_move, load_config
 
@@ -103,6 +104,25 @@ def read_saved_game(text):
         if game.last_move != (last[2] or last[1]) or game.turn != ('w' if last[2] else 'b'):
             raise ValueError('History last move does not match the board state')
     return game, history
+
+
+def replay_positions(initial_state, history, final_state):
+    """Replay recorded moves legally and return each position, checking the saved final board."""
+    game = ChessGame(initial_state)
+    positions = [game.save()]
+    for row in history:
+        for color, move in zip(('w', 'b'), row[1:]):
+            if not move:
+                continue
+            if game.turn != color:
+                raise ValueError('Move history has the wrong side to move')
+            ok, reason = game.move(move[:2], move[2:4], move[4:] or None)
+            if not ok:
+                raise ValueError(f'Cannot replay {move}: {reason}')
+            positions.append(game.save())
+    if game.save() != final_state:
+        raise ValueError('Replay does not reach the saved board; starting position or moves are missing')
+    return positions
 
 
 class ChessGame:
@@ -641,9 +661,9 @@ class ChessUI:
     LEGAL = "#a9cf54"
 
     def __init__(self, root, config=None):
-        """Build the chess window and optionally enable configured AI players."""
+        """Build the controls and a separate recording-friendly chessboard window."""
         self.root = root
-        self.root.title("Simple Chess")
+        self.root.title("Simple Chess — Controls")
 
         self.game = ChessGame(START_STATE)
         self.state_string = self.game.save()
@@ -659,13 +679,25 @@ class ChessUI:
         self.ai_results = queue.Queue()
         self.ai_events = queue.Queue()
         self.move_history = []
+        self.animating = False
+        self.animation_canvas = None
+        self.animation_after = None
+        self.initial_state = START_STATE
+        self.game_players = {side: dict(config[side]) if config else {'provider': 'human'}
+                             for side in ('white', 'black')}
+        self.replay_mode = False
+        self.replay_running = False
+        self.replay_index = 0
+        self.replay_frames = []
+        self.replay_final_state = None
+        self.replay_after = None
 
         layout = tk.Frame(root)
         layout.pack(fill=tk.BOTH, expand=True)
         game_panel = tk.Frame(layout)
-        game_panel.pack(side=tk.LEFT, anchor='n')
+        game_panel.pack(side=tk.TOP, fill=tk.X)
         exchange_panel = tk.Frame(layout)
-        exchange_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+        exchange_panel.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=10, pady=10)
         self.exchange_label = tk.Label(exchange_panel, text='AI exchange — no request yet', anchor='w',
                                        font=('Segoe UI', 11, 'bold'))
         self.exchange_label.pack(fill=tk.X, pady=(0, 8))
@@ -683,7 +715,14 @@ class ChessUI:
         self.history_table.configure(yscrollcommand=history_scroll.set)
         self.history_table.pack(fill=tk.BOTH, expand=True, padx=6, pady=6)
 
-        self.board_frame = tk.Frame(game_panel)
+        self.board_window = tk.Toplevel(root)
+        self.board_window.title('Simple Chess — Board')
+        self.board_window.resizable(False, False)
+        # Closing the board hides it; the controls can reopen it without losing the game.
+        self.board_window.protocol('WM_DELETE_WINDOW', self.board_window.withdraw)
+        if root.state() == 'withdrawn':
+            self.board_window.withdraw()
+        self.board_frame = tk.Frame(self.board_window)
         self.board_frame.pack(padx=10, pady=10)
 
         # Coordinates surround the board, with White's home rank at the bottom.
@@ -738,11 +777,18 @@ class ChessUI:
         tk.Button(controls, text="Copy State", command=self.copy_state).pack(
             side=tk.LEFT, padx=4
         )
+        tk.Button(controls, text='Show Board', command=self.show_board).pack(side=tk.LEFT, padx=4)
         file_controls = tk.Frame(game_panel)
         file_controls.pack(pady=(0, 10))
         for label, command in (('Save Game', self.save_game), ('Load Game', self.load_game),
                                ('Export Moves', self.export_moves)):
             tk.Button(file_controls, text=label, command=command).pack(side=tk.LEFT, padx=4)
+        self.replay_button = tk.Button(file_controls, text='Replay Moves', command=self.toggle_replay)
+        self.replay_button.pack(side=tk.LEFT, padx=4)
+        tk.Button(file_controls, text='Stop Replay', command=self.stop_replay).pack(side=tk.LEFT, padx=4)
+        self.match_label = tk.Label(game_panel, text='', anchor='w')
+        self.match_label.pack(fill=tk.X, padx=10, pady=(0, 5))
+        self.show_match_players()
 
         if config:
             self.ai_button = tk.Button(controls, text='Request AI Move', command=self.request_ai_move)
@@ -753,6 +799,11 @@ class ChessUI:
             tk.Label(game_panel, text=players).pack(pady=(0, 5))
             self.root.after(100, self.poll_ai)
         self.refresh()
+
+    def show_board(self):
+        """Reopen and raise the separate chessboard window without changing the current game."""
+        self.board_window.deiconify()
+        self.board_window.lift()
 
     def create_exchange_box(self, parent, title):
         """Create a scrollable, selectable, read-only text area for AI exchange details."""
@@ -799,7 +850,12 @@ class ChessUI:
             return
         path = Path(name)
         try:
-            data = {'state': self.game.save(), 'moves': self.move_history}
+            # Store player/model settings only, never credentials or prompt transcripts.
+            players = {side: {key: value for key, value in player.items()
+                             if key in ('provider', 'model', 'reasoning_effort')}
+                       for side, player in self.game_players.items()}
+            data = {'version': 2, 'state': self.replay_final_state if self.replay_mode else self.game.save(),
+                    'initial_state': self.initial_state, 'moves': self.move_history, 'players': players}
             path.write_text(json.dumps(data, indent=2) + '\n', encoding='utf-8')
             csv_path = path.with_name(path.stem + '.moves.csv')
             csv_path.write_text(moves_csv(self.move_history), encoding='utf-8')
@@ -825,14 +881,27 @@ class ChessUI:
         if not name:
             return
         try:
-            game, history = read_saved_game(Path(name).read_text(encoding='utf-8-sig'))
+            text = Path(name).read_text(encoding='utf-8-sig')
+            game, history = read_saved_game(text)
+            data = json.loads(text) if text.strip().startswith('{') else {}
+            initial = data.get('initial_state', START_STATE if history else game.save())
+            ChessGame(initial)
+            players = data.get('players', {side: {'provider': 'unknown'} for side in ('white', 'black')})
+            if (not isinstance(players, dict) or any(not isinstance(players.get(side), dict)
+                    for side in ('white', 'black'))):
+                raise ValueError('Invalid saved player details')
         except (OSError, ValueError) as exc:
             messagebox.showerror('Load failed', str(exc), parent=self.root)
             return
         self.stop_ai()
+        self.stop_replay()
+        self.cancel_animation()
         self.game = game
         self.clear_move_history()
         self.move_history = history
+        self.initial_state = initial
+        self.game_players = players
+        self.show_match_players()
         for row in history:
             self.history_table.insert('', tk.END, iid=str(row[0]), values=row)
         if history:
@@ -844,9 +913,83 @@ class ChessUI:
         self.legal_targets.clear()
         self.refresh()
 
+    def show_match_players(self):
+        """Show the saved matchup, including provider, model, and effort when recorded."""
+        labels = []
+        for side in ('white', 'black'):
+            player = self.game_players[side]
+            details = str(player.get('provider', 'unknown'))
+            if player.get('model'):
+                details += ' / ' + str(player['model'])
+            if player.get('reasoning_effort'):
+                details += ' (' + str(player['reasoning_effort']) + ')'
+            labels.append(f'{side.title()}: {details}')
+        self.match_label.configure(text=' | '.join(labels))
+
+    def toggle_replay(self):
+        """Start, pause, or resume an animated replay using only recorded local moves."""
+        if self.replay_mode:
+            self.replay_running = not self.replay_running
+        else:
+            if not self.move_history:
+                messagebox.showinfo('Replay', 'This game has no recorded moves.', parent=self.root)
+                return
+            try:
+                frames = replay_positions(self.initial_state, self.move_history, self.game.save())
+            except ValueError as exc:
+                messagebox.showerror('Cannot replay', str(exc), parent=self.root)
+                return
+            self.stop_ai()
+            self.cancel_animation()
+            self.replay_final_state = self.game.save()
+            self.replay_frames = frames
+            self.replay_index = 0
+            self.replay_mode = True
+            self.replay_running = True
+            self.game = ChessGame(frames[0])
+            self.selected = None
+            self.legal_targets.clear()
+            self.replay_after = self.root.after(100, self.replay_tick)
+        self.replay_button.configure(text='Pause Replay' if self.replay_running else 'Resume Replay')
+        self.refresh()
+
+    def replay_tick(self):
+        """Advance one recorded move when animation is idle, without calling either AI provider."""
+        self.replay_after = None
+        if not self.replay_mode:
+            return
+        if self.replay_running and not self.animating:
+            if self.replay_index + 1 >= len(self.replay_frames):
+                self.stop_replay()
+                return
+            before = [row[:] for row in self.game.board]
+            self.replay_index += 1
+            self.game = ChessGame(self.replay_frames[self.replay_index])
+            self.state_string = self.game.save()
+            self.state_var.set(self.state_string)
+            self.animate_move(before, self.game.last_move)
+            self.refresh()
+        self.replay_after = self.root.after(250, self.replay_tick)
+
+    def stop_replay(self):
+        """Stop replay and restore the saved final position without altering move history."""
+        if not getattr(self, 'replay_mode', False):
+            return
+        if self.replay_after is not None:
+            self.root.after_cancel(self.replay_after)
+            self.replay_after = None
+        self.cancel_animation()
+        self.replay_mode = False
+        self.replay_running = False
+        self.game = ChessGame(self.replay_final_state)
+        self.state_string = self.game.save()
+        self.state_var.set(self.state_string)
+        self.replay_button.configure(text='Replay Moves')
+        self.refresh()
+
     def on_square(self, row, col):
         """Handle human piece selection, destination clicks, promotion, and move results."""
-        if self.ai_config and self.current_player().get('provider', 'human') != 'human':
+        if self.replay_mode or self.animating or (self.ai_config and self.current_player().get('provider', 'human') != 'human'):
             return
         piece = self.game.board[row][col]
 
@@ -878,10 +1021,12 @@ class ChessUI:
             if promotion is None:
                 return
 
+        before = [rank[:] for rank in self.game.board]
         ok, reason = self.game.move(src, dst, promotion)
         if not ok:
             messagebox.showerror("Illegal move", reason)
         else:
+            self.animate_move(before, src + dst + (promotion or ''))
             self.record_move()
             # Keep the compact board state synchronized with the displayed game.
             self.state_string = self.game.save()
@@ -942,7 +1087,10 @@ class ChessUI:
         try:
             game = ChessGame(text)
             self.stop_ai()
+            self.stop_replay()
+            self.cancel_animation()
             self.game = game
+            self.initial_state = game.save()
             self.clear_move_history()
             self.ai_plies = 0
             self.state_string = self.game.save()
@@ -956,8 +1104,14 @@ class ChessUI:
     def reset(self):
         """Pause AI play and restore the starting board and AI move counter."""
         self.stop_ai()
+        self.stop_replay()
+        self.cancel_animation()
         self.ai_plies = 0
         self.game = ChessGame(START_STATE)
+        self.initial_state = START_STATE
+        self.game_players = {side: dict(self.ai_config[side]) if self.ai_config else {'provider': 'human'}
+                             for side in ('white', 'black')}
+        self.show_match_players()
         self.clear_move_history()
         self.state_string = self.game.save()
         self.state_var.set(self.state_string)
@@ -986,6 +1140,8 @@ class ChessUI:
 
     def toggle_auto_mode(self):
         """Start automatic AI turns or stop immediately and discard any pending move."""
+        if getattr(self, 'replay_mode', False):
+            return
         if self.auto_mode:
             self.stop_ai()
         elif self.game.status() not in ('checkmate', 'stalemate'):
@@ -995,7 +1151,7 @@ class ChessUI:
 
     def request_ai_move(self):
         """Request exactly one AI turn when the current side is AI and no request is pending."""
-        if self.ai_busy or self.ai_running or self.current_player()['provider'] == 'human':
+        if getattr(self, 'replay_mode', False) or getattr(self, 'animating', False) or self.ai_busy or self.ai_running or self.current_player()['provider'] == 'human':
             return
         if self.game.status() in ('checkmate', 'stalemate'):
             return
@@ -1035,11 +1191,13 @@ class ChessUI:
                     self.stop_ai()
                     messagebox.showerror('AI paused', error)
                 else:
+                    before = [rank[:] for rank in self.game.board]
                     ok, reason = self.game.move(move[:2], move[2:4], move[4:] or None)
                     if not ok:
                         self.stop_ai()
                         messagebox.showerror('AI paused', reason)
                     else:
+                        self.animate_move(before, move)
                         self.record_move()
                         self.ai_plies += 1
                         self.state_string = self.game.save()
@@ -1047,13 +1205,13 @@ class ChessUI:
                 self.ai_running = False
                 self.next_auto_move_at = time.monotonic() + self.ai_config.get('move_delay_ms', 500) / 1000
             self.refresh()
-        if getattr(self, 'auto_mode', False) and not self.ai_busy and not self.ai_running:
+        if getattr(self, 'auto_mode', False) and not getattr(self, 'animating', False) and not self.ai_busy and not self.ai_running:
             if self.game.status() in ('checkmate', 'stalemate'):
                 self.stop_ai()
                 self.refresh()
             elif time.monotonic() >= self.next_auto_move_at and self.current_player()['provider'] != 'human':
                 self.request_ai_move()
-        if self.ai_running and not self.ai_busy:
+        if self.ai_running and not self.ai_busy and not getattr(self, 'animating', False):
             if self.game.status() in ('checkmate', 'stalemate'):
                 self.stop_ai()
                 self.refresh()
@@ -1091,6 +1249,89 @@ class ChessUI:
                 threading.Thread(target=worker, daemon=True).start()
         self.root.after(100, self.poll_ai)
 
+    def cancel_animation(self):
+        """Remove the temporary animated board and cancel its next frame when replacing a game."""
+        if self.animation_after is not None:
+            self.root.after_cancel(self.animation_after)
+            self.animation_after = None
+        if self.animation_canvas is not None:
+            self.animation_canvas.destroy()
+            self.animation_canvas = None
+        self.animating = False
+
+    def animate_move(self, before, move):
+        """Slide pieces over the board and shrink captured pieces with a brief burst effect."""
+        self.cancel_animation()
+        sr, sc = parse_square(move[:2])
+        dr, dc = parse_square(move[2:4])
+        piece = before[sr][sc]
+        capture_square = (dr, dc) if before[dr][dc] else None
+        # An en-passant victim is beside the pawn's source rather than on its destination.
+        if piece.lower() == 'p' and sc != dc and capture_square is None:
+            capture_square = (sr, dc)
+        moving = [(piece, sr, sc, dr, dc)]
+        if piece.lower() == 'k' and abs(dc - sc) == 2:
+            rook_from, rook_to = (7, 5) if dc > sc else (0, 3)
+            moving.append((before[sr][rook_from], sr, rook_from, sr, rook_to))
+        self.root.update_idletasks()
+        tile = self.buttons[0][0].master
+        canvas = tk.Canvas(self.board_frame, width=640, height=640, highlightthickness=0)
+        canvas.place(x=tile.winfo_x(), y=tile.winfo_y())
+        self.animation_canvas = canvas
+        self.animating = True
+        started = time.monotonic()
+        duration = 0.60 if capture_square else 0.36
+        hidden = {(r, c) for _, r, c, _, _ in moving}
+        if capture_square:
+            hidden.add(capture_square)
+
+        def frame():
+            """Draw one eased movement/capture frame and schedule the next without blocking the UI."""
+            if self.animation_canvas is not canvas:
+                return
+            elapsed = time.monotonic() - started
+            progress = min(elapsed / 0.36, 1)
+            eased = progress * progress * (3 - 2 * progress)
+            canvas.delete('all')
+            for r in range(8):
+                for c in range(8):
+                    color = self.LIGHT if (r + c) % 2 == 0 else self.DARK
+                    canvas.create_rectangle(c * 80, r * 80, (c + 1) * 80, (r + 1) * 80,
+                                            fill=color, outline=color)
+                    if before[r][c] and (r, c) not in hidden:
+                        canvas.create_text(c * 80 + 40, r * 80 + 40, text=UNICODE_PIECES[before[r][c]],
+                                           font=('Segoe UI Symbol', 24))
+            if capture_square:
+                cr, cc = capture_square
+                fade = max(0, min((elapsed - 0.27) / 0.33, 1))
+                x, y = cc * 80 + 40, cr * 80 + 40
+                if fade < 1:
+                    canvas.create_text(x, y, text=UNICODE_PIECES[before[cr][cc]],
+                                       font=('Segoe UI Symbol', max(1, int(24 * (1 - fade)))),
+                                       fill='#b3261e' if fade else '#000000')
+                if 0 < fade < 1:
+                    radius = 12 + fade * 30
+                    for angle in range(0, 360, 45):
+                        radians = math.radians(angle)
+                        px, py = x + math.cos(radians) * radius, y + math.sin(radians) * radius
+                        canvas.create_oval(px - 3, py - 3, px + 3, py + 3, fill='#d45536', outline='')
+            for moving_piece, r, c, tr, tc in moving:
+                x = (c + (tc - c) * eased) * 80 + 40
+                y = (r + (tr - r) * eased) * 80 + 40
+                # Reveal the promoted piece as the pawn reaches its destination.
+                glyph = self.game.board[tr][tc] if progress == 1 else moving_piece
+                canvas.create_text(x, y, text=UNICODE_PIECES[glyph], font=('Segoe UI Symbol', 24))
+            if elapsed >= duration:
+                self.animation_after = None
+                self.cancel_animation()
+                if self.auto_mode:
+                    self.next_auto_move_at = time.monotonic() + self.ai_config.get('move_delay_ms', 500) / 1000
+                self.refresh()
+            else:
+                self.animation_after = self.root.after(16, frame)
+
+        frame()
+
     def refresh(self):
         """Redraw pieces, selection highlights, and the current game status."""
         for r in range(8):
@@ -1101,14 +1342,19 @@ class ChessUI:
                 if self.selected == (r, c):
                     color = self.SELECTED
                 elif (r, c) in self.legal_targets:
-                    color = self.LEGAL
+                    color = '#b6d87a' if (r + c) % 2 == 0 else '#739747'
                 else:
                     color = base
 
+                # Full-tile highlights retain the board's alternating light/dark pattern.
                 self.buttons[r][c].configure(
-                    text=UNICODE_PIECES.get(piece, ""),
+                    text=UNICODE_PIECES.get(piece, ''),
                     bg=color,
                     activebackground=color,
+                    fg='#000000',
+                    activeforeground='#000000',
+                    font=('Segoe UI Symbol', 24),
+                    highlightthickness=0,
                 )
 
         side = "White" if self.game.turn == "w" else "Black"
@@ -1124,17 +1370,19 @@ class ChessUI:
 
         if self.game.last_move and self.game.last_move != "-":
             text += f" | Last move: {self.game.last_move}"
+        if self.replay_mode:
+            text = f'Replay {self.replay_index}/{len(self.replay_frames) - 1} — ' + text
 
         self.status_label.configure(text=text)
         if self.ai_config:
-            waiting = self.ai_busy or self.ai_running
+            waiting = self.ai_busy or self.ai_running or self.animating or self.replay_mode
             enabled = (not waiting and not self.auto_mode and self.current_player()['provider'] != 'human'
                        and status not in ('checkmate', 'stalemate'))
             request_label = 'Request Random Move' if self.current_player()['provider'] == 'random' else 'Request AI Move'
             self.ai_button.configure(text='Thinking…' if waiting else request_label,
                                      state=tk.NORMAL if enabled else tk.DISABLED)
             self.auto_button.configure(text='Stop Auto Mode' if self.auto_mode else 'Start Auto Mode',
-                                       state=tk.NORMAL if self.auto_mode or status not in ('checkmate', 'stalemate') else tk.DISABLED)
+                                       state=tk.NORMAL if not self.replay_mode and (self.auto_mode or status not in ('checkmate', 'stalemate')) else tk.DISABLED)
 
 
 def run_tests():
@@ -1206,5 +1454,16 @@ if __name__ == "__main__":
         except (ValueError, OSError) as exc:
             parser.error(str(exc))
         root = tk.Tk()
-        ChessUI(root, config)
+        if args.config:
+            ChessUI(root, config)
+        else:
+            from game_setup import GameSetup
+
+            def launch_game(settings, auto):
+                """Open the selected matchup and optionally begin automatic play."""
+                ui = ChessUI(root, settings)
+                if auto:
+                    ui.toggle_auto_mode()
+
+            GameSetup(root, launch_game)
         root.mainloop()

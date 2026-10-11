@@ -1,0 +1,1188 @@
+{
+  "generated_at_utc": "2026-10-05T18:35:05.818108+00:00",
+  "scope": "All model IDs returned by the providers for your API keys",
+  "usage": "Copy a player_config into white or black in ai_config.json. This catalogue is not a game config.",
+  "compatibility": "Listing does not verify chess or endpoint support. OpenAI lists also include image, audio, embedding, moderation and legacy models which cannot play this game. Select a text model supporting Responses; Anthropic players use Messages. Set reasoning_effort only when supported by the selected model.",
+  "sources": {
+    "openai": "https://api.openai.com/v1/models",
+    "anthropic": "https://api.anthropic.com/v1/models"
+  },
+  "providers": {
+    "openai": [
+      {
+        "model": "babbage-002",
+        "player_config": {
+          "provider": "openai",
+          "model": "babbage-002",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "chat-latest",
+        "player_config": {
+          "provider": "openai",
+          "model": "chat-latest",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "chatgpt-image-latest",
+        "player_config": {
+          "provider": "openai",
+          "model": "chatgpt-image-latest",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "davinci-002",
+        "player_config": {
+          "provider": "openai",
+          "model": "davinci-002",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-3.5-turbo",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-3.5-turbo",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-3.5-turbo-0125",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-3.5-turbo-0125",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-3.5-turbo-1106",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-3.5-turbo-1106",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-3.5-turbo-16k",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-3.5-turbo-16k",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-3.5-turbo-instruct",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-3.5-turbo-instruct",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-3.5-turbo-instruct-0914",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-3.5-turbo-instruct-0914",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4-0613",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4-0613",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4-turbo",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4-turbo",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4-turbo-2024-04-09",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4-turbo-2024-04-09",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4.1",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4.1",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4.1-2025-04-14",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4.1-2025-04-14",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4.1-mini",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4.1-mini",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4.1-mini-2025-04-14",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4.1-mini-2025-04-14",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4.1-nano",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4.1-nano",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4.1-nano-2025-04-14",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4.1-nano-2025-04-14",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4o",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4o",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4o-2024-05-13",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4o-2024-05-13",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4o-2024-08-06",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4o-2024-08-06",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4o-2024-11-20",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4o-2024-11-20",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4o-mini",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4o-mini",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4o-mini-2024-07-18",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4o-mini-2024-07-18",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4o-mini-search-preview",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4o-mini-search-preview",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4o-mini-search-preview-2025-03-11",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4o-mini-search-preview-2025-03-11",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4o-mini-transcribe",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4o-mini-transcribe",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4o-mini-transcribe-2025-03-20",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4o-mini-transcribe-2025-03-20",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4o-mini-transcribe-2025-12-15",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4o-mini-transcribe-2025-12-15",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4o-mini-tts",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4o-mini-tts",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4o-mini-tts-2025-03-20",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4o-mini-tts-2025-03-20",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4o-mini-tts-2025-12-15",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4o-mini-tts-2025-12-15",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4o-search-preview",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4o-search-preview",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4o-search-preview-2025-03-11",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4o-search-preview-2025-03-11",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4o-transcribe",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4o-transcribe",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-4o-transcribe-diarize",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-4o-transcribe-diarize",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5-2025-08-07",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5-2025-08-07",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5-chat-latest",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5-chat-latest",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5-codex",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5-codex",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5-mini",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5-mini",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5-mini-2025-08-07",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5-mini-2025-08-07",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5-nano",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5-nano",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5-nano-2025-08-07",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5-nano-2025-08-07",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5-pro",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5-pro",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5-pro-2025-10-06",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5-pro-2025-10-06",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5-search-api",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5-search-api",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5-search-api-2025-10-14",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5-search-api-2025-10-14",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.1",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.1",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.1-2025-11-13",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.1-2025-11-13",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.1-chat-latest",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.1-chat-latest",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.1-codex",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.1-codex",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.1-codex-max",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.1-codex-max",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.1-codex-mini",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.1-codex-mini",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.2",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.2",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.2-2025-12-11",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.2-2025-12-11",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.2-chat-latest",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.2-chat-latest",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.2-codex",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.2-codex",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.2-pro",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.2-pro",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.2-pro-2025-12-11",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.2-pro-2025-12-11",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.3-chat-latest",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.3-chat-latest",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.3-codex",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.3-codex",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.4",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.4",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.4-2026-03-05",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.4-2026-03-05",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.4-mini",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.4-mini",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.4-mini-2026-03-17",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.4-mini-2026-03-17",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.4-nano",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.4-nano",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.4-nano-2026-03-17",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.4-nano-2026-03-17",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.4-pro",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.4-pro",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.4-pro-2026-03-05",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.4-pro-2026-03-05",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.5",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.5",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.5-2026-04-23",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.5-2026-04-23",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.5-pro",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.5-pro",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.5-pro-2026-04-23",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.5-pro-2026-04-23",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.6-luna",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.6-luna",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.6-sol",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.6-sol",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-5.6-terra",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-5.6-terra",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-6-astra",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-6-astra",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-6-luna",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-6-luna",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-6-sol",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-6-sol",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-6.1-sol",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-audio",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-audio",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-audio-1.5",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-audio-1.5",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-audio-2025-08-28",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-audio-2025-08-28",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-audio-mini",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-audio-mini",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-audio-mini-2025-10-06",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-audio-mini-2025-10-06",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-audio-mini-2025-12-15",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-audio-mini-2025-12-15",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-image-1",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-image-1",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-image-1-mini",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-image-1-mini",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-image-1.5",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-image-1.5",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-image-2",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-image-2",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-image-2-2026-04-21",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-image-2-2026-04-21",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-image-2.5-flare",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-image-2.5-flare",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-image-2.5-flare-2026-09-08",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-image-2.5-flare-2026-09-08",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-image-2.5-sunburst",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-image-2.5-sunburst",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-image-2.5-sunburst-2026-09-08",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-image-2.5-sunburst-2026-09-08",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-live-1",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-live-1",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-live-transcribe",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-live-transcribe",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-realtime",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-realtime",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-realtime-1.5",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-realtime-1.5",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-realtime-2",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-realtime-2",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-realtime-2.1",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-realtime-2.1",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-realtime-2.1-mini",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-realtime-2.1-mini",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-realtime-2025-08-28",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-realtime-2025-08-28",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-realtime-mini",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-realtime-mini",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-realtime-mini-2025-12-15",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-realtime-mini-2025-12-15",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-realtime-translate",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-realtime-translate",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-realtime-whisper",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-realtime-whisper",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "gpt-transcribe",
+        "player_config": {
+          "provider": "openai",
+          "model": "gpt-transcribe",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "o1",
+        "player_config": {
+          "provider": "openai",
+          "model": "o1",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "o1-2024-12-17",
+        "player_config": {
+          "provider": "openai",
+          "model": "o1-2024-12-17",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "o1-pro",
+        "player_config": {
+          "provider": "openai",
+          "model": "o1-pro",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "o1-pro-2025-03-19",
+        "player_config": {
+          "provider": "openai",
+          "model": "o1-pro-2025-03-19",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "o3",
+        "player_config": {
+          "provider": "openai",
+          "model": "o3",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "o3-2025-04-16",
+        "player_config": {
+          "provider": "openai",
+          "model": "o3-2025-04-16",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "o3-mini",
+        "player_config": {
+          "provider": "openai",
+          "model": "o3-mini",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "o3-mini-2025-01-31",
+        "player_config": {
+          "provider": "openai",
+          "model": "o3-mini-2025-01-31",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "o4-mini",
+        "player_config": {
+          "provider": "openai",
+          "model": "o4-mini",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "o4-mini-2025-04-16",
+        "player_config": {
+          "provider": "openai",
+          "model": "o4-mini-2025-04-16",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "omni-moderation-2024-09-26",
+        "player_config": {
+          "provider": "openai",
+          "model": "omni-moderation-2024-09-26",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "omni-moderation-latest",
+        "player_config": {
+          "provider": "openai",
+          "model": "omni-moderation-latest",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "sora-2",
+        "player_config": {
+          "provider": "openai",
+          "model": "sora-2",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "sora-2-pro",
+        "player_config": {
+          "provider": "openai",
+          "model": "sora-2-pro",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "text-embedding-3-large",
+        "player_config": {
+          "provider": "openai",
+          "model": "text-embedding-3-large",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "text-embedding-3-small",
+        "player_config": {
+          "provider": "openai",
+          "model": "text-embedding-3-small",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "text-embedding-ada-002",
+        "player_config": {
+          "provider": "openai",
+          "model": "text-embedding-ada-002",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "tts-1",
+        "player_config": {
+          "provider": "openai",
+          "model": "tts-1",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "tts-1-1106",
+        "player_config": {
+          "provider": "openai",
+          "model": "tts-1-1106",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "tts-1-hd",
+        "player_config": {
+          "provider": "openai",
+          "model": "tts-1-hd",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "tts-1-hd-1106",
+        "player_config": {
+          "provider": "openai",
+          "model": "tts-1-hd-1106",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      },
+      {
+        "model": "whisper-1",
+        "player_config": {
+          "provider": "openai",
+          "model": "whisper-1",
+          "api_key_env": "OPENAI_API_KEY"
+        }
+      }
+    ],
+    "anthropic": [
+      {
+        "model": "claude-fable-5",
+        "player_config": {
+          "provider": "anthropic",
+          "model": "claude-fable-5",
+          "api_key_env": "ANTHROPIC_API_KEY"
+        },
+        "display_name": "Claude Fable 5"
+      },
+      {
+        "model": "claude-fable-5-1",
+        "player_config": {
+          "provider": "anthropic",
+          "model": "claude-fable-5-1",
+          "api_key_env": "ANTHROPIC_API_KEY"
+        },
+        "display_name": "Claude Fable 5.1"
+      },
+      {
+        "model": "claude-haiku-4-5-20251001",
+        "player_config": {
+          "provider": "anthropic",
+          "model": "claude-haiku-4-5-20251001",
+          "api_key_env": "ANTHROPIC_API_KEY"
+        },
+        "display_name": "Claude Haiku 4.5"
+      },
+      {
+        "model": "claude-opus-4-5-20251101",
+        "player_config": {
+          "provider": "anthropic",
+          "model": "claude-opus-4-5-20251101",
+          "api_key_env": "ANTHROPIC_API_KEY"
+        },
+        "display_name": "Claude Opus 4.5"
+      },
+      {
+        "model": "claude-opus-4-6",
+        "player_config": {
+          "provider": "anthropic",
+          "model": "claude-opus-4-6",
+          "api_key_env": "ANTHROPIC_API_KEY"
+        },
+        "display_name": "Claude Opus 4.6"
+      },
+      {
+        "model": "claude-opus-4-7",
+        "player_config": {
+          "provider": "anthropic",
+          "model": "claude-opus-4-7",
+          "api_key_env": "ANTHROPIC_API_KEY"
+        },
+        "display_name": "Claude Opus 4.7"
+      },
+      {
+        "model": "claude-opus-4-8",
+        "player_config": {
+          "provider": "anthropic",
+          "model": "claude-opus-4-8",
+          "api_key_env": "ANTHROPIC_API_KEY"
+        },
+        "display_name": "Claude Opus 4.8"
+      },
+      {
+        "model": "claude-opus-5",
+        "player_config": {
+          "provider": "anthropic",
+          "model": "claude-opus-5",
+          "api_key_env": "ANTHROPIC_API_KEY"
+        },
+        "display_name": "Claude Opus 5"
+      },
+      {
+        "model": "claude-opus-5-5",
+        "player_config": {
+          "provider": "anthropic",
+          "model": "claude-opus-5-5",
+          "api_key_env": "ANTHROPIC_API_KEY"
+        },
+        "display_name": "Claude Opus 5.5"
+      },
+      {
+        "model": "claude-sonnet-4-6",
+        "player_config": {
+          "provider": "anthropic",
+          "model": "claude-sonnet-4-6",
+          "api_key_env": "ANTHROPIC_API_KEY"
+        },
+        "display_name": "Claude Sonnet 4.6"
+      },
+      {
+        "model": "claude-sonnet-5",
+        "player_config": {
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "api_key_env": "ANTHROPIC_API_KEY"
+        },
+        "display_name": "Claude Sonnet 5"
+      },
+      {
+        "model": "claude-sonnet-5-5",
+        "player_config": {
+          "provider": "anthropic",
+          "model": "claude-sonnet-5-5",
+          "api_key_env": "ANTHROPIC_API_KEY"
+        },
+        "display_name": "Claude Sonnet 5.5"
+      }
+    ]
+  }
+}
